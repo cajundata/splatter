@@ -106,6 +106,21 @@ func TestInitProjectOutsideWorkspaceIsUsageError(t *testing.T) {
 	}
 }
 
+func TestInitInvalidProjectNameIsUsageError(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := runCLI(t, dir, "init"); err != nil {
+		t.Fatal(err)
+	}
+	_, err := runCLI(t, dir, "init", "Bad Name")
+	if err == nil {
+		t.Fatal("want error")
+	}
+	var u usageErr
+	if !errors.As(err, &u) {
+		t.Fatalf("want usageErr (exit 2), got %T: %v", err, err)
+	}
+}
+
 func TestValidateCleanWorkspaceExitsZero(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := runCLI(t, dir, "init"); err != nil {

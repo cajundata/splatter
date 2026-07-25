@@ -16,3 +16,6 @@ until every box is checked.
       content contains `eol=lf`
 - [ ] `git init; git add -A; git commit -m x` inside ws, then
       `git ls-files --eol` — all text files show `i/lf`
+- [ ] On the M-series Mac: run `bin/darwin-arm64/splatter init && splatter validate`
+      in a fresh directory once — the arm64 artifact was format-verified but not
+      executed during S1 (build host was x86_64)

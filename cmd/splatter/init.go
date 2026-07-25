@@ -45,6 +45,9 @@ func newInitCmd() *cobra.Command {
 				res, err = workspace.ScaffoldProject(root, args[0])
 			}
 			if err != nil {
+				if errors.Is(err, workspace.ErrInvalidName) {
+					return usageErr{err}
+				}
 				return err
 			}
 			result.Created = res.Created

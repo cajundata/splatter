@@ -13,6 +13,8 @@ import (
 
 var ErrNoWorkspace = errors.New("not inside a splatter workspace")
 
+var ErrInvalidName = errors.New("invalid project name")
+
 var projectNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 type ScaffoldResult struct {
@@ -115,7 +117,7 @@ func ScaffoldProject(root, name string) (*ScaffoldResult, error) {
 		return nil, fmt.Errorf("%s: %w", root, ErrNoWorkspace)
 	}
 	if !projectNameRe.MatchString(name) {
-		return nil, fmt.Errorf("invalid project name %q (want lowercase letters, digits, hyphens)", name)
+		return nil, fmt.Errorf("%q: %w (want lowercase letters, digits, hyphens)", name, ErrInvalidName)
 	}
 	res := &ScaffoldResult{}
 	for _, sub := range []string{"briefs", "critiques", "packages"} {

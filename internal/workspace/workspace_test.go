@@ -134,8 +134,8 @@ func TestScaffoldProject(t *testing.T) {
 		t.Fatalf("re-run: %#v", res2)
 	}
 	// Bad names and non-workspace roots error.
-	if _, err := ScaffoldProject(dir, "Bad Name"); err == nil {
-		t.Fatal("want error for invalid project name")
+	if _, err := ScaffoldProject(dir, "Bad Name"); !errors.Is(err, ErrInvalidName) {
+		t.Fatalf("want ErrInvalidName, got %v", err)
 	}
 	if _, err := ScaffoldProject(t.TempDir(), "ok"); err == nil {
 		t.Fatal("want error outside workspace")

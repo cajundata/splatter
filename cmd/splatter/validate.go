@@ -29,7 +29,10 @@ func newValidateCmd() *cobra.Command {
 			}
 			root, err := workspace.FindRoot(cwd)
 			if err != nil {
-				return usageErr{err}
+				if errors.Is(err, workspace.ErrNoWorkspace) {
+					return usageErr{err}
+				}
+				return err
 			}
 			findings, err := workspace.Validate(root, project)
 			if err != nil {

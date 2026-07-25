@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -27,7 +28,10 @@ func newStatusCmd() *cobra.Command {
 			}
 			root, err := workspace.FindRoot(cwd)
 			if err != nil {
-				return usageErr{err}
+				if errors.Is(err, workspace.ErrNoWorkspace) {
+					return usageErr{err}
+				}
+				return err
 			}
 			projects, err := workspace.Status(root)
 			if err != nil {
