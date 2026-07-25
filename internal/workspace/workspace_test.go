@@ -141,3 +141,22 @@ func TestScaffoldProject(t *testing.T) {
 		t.Fatal("want error outside workspace")
 	}
 }
+
+func TestScaffoldStubsContainBaselines(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := ScaffoldWorkspace(dir); err != nil {
+		t.Fatal(err)
+	}
+	py, _ := os.ReadFile(filepath.Join(dir, "providers.yaml"))
+	for _, want := range []string{"gemini-baseline", "gemini-2.5-flash-image", "openai-baseline", "gpt-image-1", "baseline:"} {
+		if !strings.Contains(string(py), want) {
+			t.Fatalf("providers.yaml stub missing %q:\n%s", want, py)
+		}
+	}
+	pr, _ := os.ReadFile(filepath.Join(dir, "pricing.yaml"))
+	for _, want := range []string{"gemini-2.5-flash-image", "gpt-image-1", "usd_per_image"} {
+		if !strings.Contains(string(pr), want) {
+			t.Fatalf("pricing.yaml stub missing %q:\n%s", want, pr)
+		}
+	}
+}

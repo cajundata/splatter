@@ -31,18 +31,27 @@ const gitignore = `projects/*/runs/*/images/
 `
 
 const providersStub = `version: 1
-profiles: { }
-# Example:
-#   gemini-baseline:
-#     provider: gemini
-#     model: <model id>
-#     native: { }
-profile_sets: { }
+profiles:
+  gemini-baseline:
+    provider: gemini
+    model: gemini-2.5-flash-image
+    native: { }
+  openai-baseline:
+    provider: openai
+    model: gpt-image-1
+    native: { }
+profile_sets:
+  baseline: [gemini-baseline, openai-baseline]
 `
 
-const pricingStub = `version: "2026-07-24.0"
+const pricingStub = `version: "2026-07-25.0"
 # Per-image prices used when the API response reports no cost.
 # Bump version on every edit; it lands in cost.source as table:<version>.
+models:
+  gemini-2.5-flash-image:
+    usd_per_image: 0.039
+  gpt-image-1:
+    usd_per_image: 0.042
 `
 
 // isRoot reports whether dir carries the workspace marker.
