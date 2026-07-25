@@ -168,10 +168,14 @@ func TestGenerateNoImageIsDecodeError(t *testing.T) {
 	srv := serve(t, 200, body, nil, nil)
 	defer srv.Close()
 	a := New("k", srv.URL)
-	_, err := a.Generate(context.Background(), provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square"})
+	res, err := a.Generate(context.Background(), provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square"})
 	var pe *provider.Error
 	if !errors.As(err, &pe) || pe.Stage != "decode" {
 		t.Fatalf("want decode-stage error, got %v", err)
+	}
+	// decode failures still reached the wire: partial evidence must survive
+	if res.Latency <= 0 || res.Meta.HTTPStatus != 200 || len(res.Raw) == 0 {
+		t.Fatalf("decode failure lost wire evidence: %+v", res)
 	}
 }
 

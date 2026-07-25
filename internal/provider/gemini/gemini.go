@@ -97,6 +97,14 @@ func (a *Adapter) Generate(ctx context.Context, req provider.Request) (provider.
 		return partial, normalize(err, rec.HTTPStatus())
 	}
 
+	// Decode-stage failures still reached the wire: preserve the exchange's
+	// evidence (Latency/Raw/Meta.HTTPStatus) in the partial Result alongside
+	// the error, same as request-stage failures.
+	decodePartial := func() provider.Result {
+		return provider.Result{Latency: rec.Latency(), Raw: rec.Body(),
+			Meta: provider.CallMeta{ModelReturned: resp.ModelVersion, HTTPStatus: rec.HTTPStatus()}}
+	}
+
 	var images []provider.Image
 	if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 		for _, part := range resp.Candidates[0].Content.Parts {
@@ -106,14 +114,14 @@ func (a *Adapter) Generate(ctx context.Context, req provider.Request) (provider.
 			data := part.InlineData.Data
 			cfgImg, _, derr := image.DecodeConfig(bytes.NewReader(data))
 			if derr != nil {
-				return zero, &provider.Error{Stage: "decode",
+				return decodePartial(), &provider.Error{Stage: "decode",
 					Message: fmt.Sprintf("undecodable %s payload: %v", part.InlineData.MIMEType, derr)}
 			}
 			images = append(images, provider.Image{Bytes: data, W: cfgImg.Width, H: cfgImg.Height})
 		}
 	}
 	if len(images) == 0 {
-		return zero, &provider.Error{Stage: "decode", Message: "response contained no image parts"}
+		return decodePartial(), &provider.Error{Stage: "decode", Message: "response contained no image parts"}
 	}
 
 	return provider.Result{

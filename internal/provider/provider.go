@@ -46,11 +46,11 @@ type CallMeta struct {
 	HTTPStatus        int
 }
 
-// Result is the adapter's return value. On a "request"-stage error the
-// adapter returns a PARTIAL Result alongside the error — Latency, Raw, and
-// Meta.HTTPStatus from the failed exchange — because the spec requires
-// failed-call records to preserve latency and status when the call reached
-// the wire. Config-stage errors return a zero Result.
+// Result is the adapter's return value. On a "request"- or "decode"-stage
+// error the adapter returns a PARTIAL Result alongside the error — Latency,
+// Raw, and Meta.HTTPStatus from the completed exchange — because the spec
+// requires failed-call records to preserve latency and status when the call
+// reached the wire. Config-stage errors return a zero Result.
 type Result struct {
 	Images       []Image
 	Latency      time.Duration // from the instrumented transport
