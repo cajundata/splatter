@@ -39,8 +39,19 @@ func TestRedactRawReplacesLargePayloads(t *testing.T) {
 	if _, ok := parsed["list"].([]any)[0].(map[string]any); !ok {
 		t.Fatal("payloads inside arrays must be replaced too")
 	}
-	if strings.Contains(string(out), base64.StdEncoding.EncodeToString(big[:100])) {
+	if strings.Contains(string(out), base64.StdEncoding.EncodeToString(big[:99])) {
 		t.Fatal("payload bytes leaked into redacted output")
+	}
+}
+
+func TestRedactRawPreservesUntouchedContent(t *testing.T) {
+	in := []byte(`{"id":9007199254740993,"html":"<a href=\"x\">&amp;</a>"}`)
+	out := RedactRaw(in)
+	if !strings.Contains(string(out), "9007199254740993") {
+		t.Fatalf("large integer lost precision: %s", out)
+	}
+	if !strings.Contains(string(out), `<a href=\"x\">&amp;</a>`) {
+		t.Fatalf("string content HTML-escaped: %s", out)
 	}
 }
 

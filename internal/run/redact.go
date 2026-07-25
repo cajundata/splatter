@@ -4,6 +4,7 @@
 package run
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -17,15 +18,19 @@ const blobThreshold = 4096
 // RedactRaw replaces large base64 payloads with {"$blob":sha256,"bytes":N}.
 // Non-JSON input is returned verbatim (fallback preserves evidence).
 func RedactRaw(raw []byte) []byte {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
 	var v any
-	if err := json.Unmarshal(raw, &v); err != nil {
+	if err := dec.Decode(&v); err != nil {
 		return raw
 	}
-	out, err := json.Marshal(redactValue(v))
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(redactValue(v)); err != nil {
 		return raw
 	}
-	return out
+	return bytes.TrimRight(buf.Bytes(), "\n")
 }
 
 func redactValue(v any) any {
