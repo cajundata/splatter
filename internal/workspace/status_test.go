@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -30,5 +32,21 @@ func TestStatusEmptyWorkspace(t *testing.T) {
 	}
 	if len(statuses) != 0 {
 		t.Fatalf("want no projects, got %#v", statuses)
+	}
+}
+
+func TestStatusIgnoresNonDirRunEntries(t *testing.T) {
+	root := buildFixture(t)
+	proj := filepath.Join(root, "projects", "gradient-descent")
+	// a stray file matching r_* must not count as a run
+	if err := os.WriteFile(filepath.Join(proj, "runs", "r_stray.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	statuses, err := Status(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statuses[0].Runs != 1 {
+		t.Fatalf("want 1 run, got %d", statuses[0].Runs)
 	}
 }

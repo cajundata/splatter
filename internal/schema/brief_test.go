@@ -67,3 +67,36 @@ func TestBriefSHA256LineEndingInvariant(t *testing.T) {
 		t.Fatal("want 64-char hex digest")
 	}
 }
+
+func TestParseBriefClosingFenceAtEOF(t *testing.T) {
+	// closing fence with no trailing newline is still closed
+	doc := "---\nid: b_001\nproject: p\nconcept: c\naspect: square\n---"
+	meta, body, err := ParseBrief([]byte(doc))
+	if err != nil {
+		t.Fatalf("fence at EOF must parse: %v", err)
+	}
+	if meta.ID != "b_001" || body != "" {
+		t.Fatalf("got meta=%#v body=%q", meta, body)
+	}
+}
+
+func TestParseBriefMissingProjectAndConcept(t *testing.T) {
+	cases := map[string]string{
+		"missing project": "---\nid: b_001\nconcept: c\naspect: square\n---\nbody\n",
+		"missing concept": "---\nid: b_001\nproject: p\naspect: square\n---\nbody\n",
+	}
+	for name, doc := range cases {
+		if _, _, err := ParseBrief([]byte(doc)); err == nil {
+			t.Fatalf("%s: want error", name)
+		}
+	}
+}
+
+func TestParseBriefAllValidAspects(t *testing.T) {
+	for _, a := range []string{"square", "portrait_4_5", "portrait_2_3", "landscape_4_3"} {
+		doc := "---\nid: b_001\nproject: p\nconcept: c\naspect: " + a + "\n---\nbody\n"
+		if _, _, err := ParseBrief([]byte(doc)); err != nil {
+			t.Fatalf("aspect %s must be valid: %v", a, err)
+		}
+	}
+}

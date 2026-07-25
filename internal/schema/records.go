@@ -170,6 +170,12 @@ func (c CallRecord) Validate() error {
 		if img.ID == "" || img.File == "" || img.SHA256 == "" {
 			return fmt.Errorf("invalid images[%d]: id, file, sha256 all required", i)
 		}
+		if img.W < 1 || img.H < 1 {
+			return fmt.Errorf("invalid images[%d]: w and h must be >= 1", i)
+		}
+		if img.AspectActual == "" {
+			return fmt.Errorf("invalid images[%d]: aspect_actual required", i)
+		}
 	}
 	return nil
 }

@@ -254,3 +254,32 @@ func TestValidateCollectsAllFindings(t *testing.T) {
 		t.Fatalf("want all findings reported, got %#v", findings)
 	}
 }
+
+func TestValidateRunIdentityCrossChecks(t *testing.T) {
+	// header.Run must match the run directory name
+	root := buildFixture(t)
+	proj := filepath.Join(root, "projects", "gradient-descent")
+	// rename the run dir so header says r_0001 but dir is r_0002
+	if err := os.Rename(filepath.Join(proj, "runs", "r_0001"),
+		filepath.Join(proj, "runs", "r_0002")); err != nil {
+		t.Fatal(err)
+	}
+	findings, err := Validate(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustFindingContaining(t, findings, "r_0002")
+
+	// critique filename must match its run field
+	root = buildFixture(t)
+	proj = filepath.Join(root, "projects", "gradient-descent")
+	old := filepath.Join(proj, "critiques", "r_0001.json")
+	if err := os.Rename(old, filepath.Join(proj, "critiques", "r_0099.json")); err != nil {
+		t.Fatal(err)
+	}
+	findings, err = Validate(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustFindingContaining(t, findings, "r_0099")
+}

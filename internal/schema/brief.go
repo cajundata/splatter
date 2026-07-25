@@ -33,8 +33,15 @@ func ParseBrief(data []byte) (*BriefMeta, string, error) {
 	}
 	rest := norm[4:]
 	end := bytes.Index(rest, []byte("\n---\n"))
+	fenceLen := len("\n---\n")
 	if end < 0 {
-		return nil, "", fmt.Errorf("brief front matter not closed")
+		// closing fence at EOF without trailing newline
+		if bytes.HasSuffix(rest, []byte("\n---")) {
+			end = len(rest) - len("\n---")
+			fenceLen = len("\n---")
+		} else {
+			return nil, "", fmt.Errorf("brief front matter not closed")
+		}
 	}
 	var meta BriefMeta
 	if err := yaml.Unmarshal(rest[:end], &meta); err != nil {
@@ -50,7 +57,7 @@ func ParseBrief(data []byte) (*BriefMeta, string, error) {
 	case !validAspects[meta.Aspect]:
 		return nil, "", fmt.Errorf("brief invalid aspect: %q", meta.Aspect)
 	}
-	body := string(rest[end+len("\n---\n"):])
+	body := string(rest[end+fenceLen:])
 	return &meta, body, nil
 }
 

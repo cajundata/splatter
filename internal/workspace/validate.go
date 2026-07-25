@@ -23,6 +23,9 @@ type Finding struct {
 // projectNames when a named --project doesn't exist under projects/.
 var ErrProjectNotFound = errors.New("project not found")
 
+// maxLineBytes bounds a single JSONL line in evidence files.
+const maxLineBytes = 1024 * 1024
+
 // Validate walks every project (or just the named one) and returns all
 // findings. The error return is reserved for I/O failures.
 func Validate(root, project string) ([]Finding, error) {
@@ -102,7 +105,7 @@ func validateProject(root, name string) ([]Finding, error) {
 		lineNo := 0
 		var header *schema.RunHeader
 		sc := bufio.NewScanner(f)
-		sc.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
+		sc.Buffer(make([]byte, 0, maxLineBytes), maxLineBytes)
 		for sc.Scan() {
 			lineNo++
 			decoded, err := schema.DecodeManifestLine(sc.Bytes())
@@ -134,9 +137,12 @@ func validateProject(root, name string) ([]Finding, error) {
 		}
 		f.Close()
 		if err := sc.Err(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", mp, err)
 		}
 		if header != nil {
+			if dirRun := filepath.Base(rd); header.Run != dirRun {
+				add(mp, fmt.Sprintf("run header %s does not match directory %s", header.Run, dirRun))
+			}
 			if _, ok := runImages[header.Run]; !ok {
 				runImages[header.Run] = map[string]bool{}
 			}
@@ -151,7 +157,7 @@ func validateProject(root, name string) ([]Finding, error) {
 	if f, err := os.Open(vp); err == nil {
 		lineNo := 0
 		sc := bufio.NewScanner(f)
-		sc.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
+		sc.Buffer(make([]byte, 0, maxLineBytes), maxLineBytes)
 		for sc.Scan() {
 			lineNo++
 			if _, err := schema.DecodeVerdictLine(sc.Bytes()); err != nil {
@@ -160,7 +166,7 @@ func validateProject(root, name string) ([]Finding, error) {
 		}
 		f.Close()
 		if err := sc.Err(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", vp, err)
 		}
 	} else if !os.IsNotExist(err) {
 		return nil, err
@@ -181,6 +187,10 @@ func validateProject(root, name string) ([]Finding, error) {
 		if err := crit.Validate(); err != nil {
 			add(cp, err.Error())
 			continue
+		}
+		wantName := crit.Run + ".json"
+		if got := filepath.Base(cp); got != wantName {
+			add(cp, fmt.Sprintf("critique filename %s does not match run %s", got, crit.Run))
 		}
 		known, ok := runImages[crit.Run]
 		if !ok {

@@ -2,9 +2,9 @@ package workspace
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 )
 
 type ProjectStatus struct {
@@ -28,18 +28,26 @@ func Status(root string) ([]ProjectStatus, error) {
 		briefs, _ := filepath.Glob(filepath.Join(proj, "briefs", "*.md"))
 		s.Briefs = len(briefs)
 		runs, _ := filepath.Glob(filepath.Join(proj, "runs", "r_*"))
-		s.Runs = len(runs)
+		for _, r := range runs {
+			if fi, err := os.Stat(r); err == nil && fi.IsDir() {
+				s.Runs++
+			}
+		}
 		crits, _ := filepath.Glob(filepath.Join(proj, "critiques", "*.json"))
 		s.Critiques = len(crits)
 		if f, err := os.Open(filepath.Join(proj, "verdicts.jsonl")); err == nil {
 			sc := bufio.NewScanner(f)
+			sc.Buffer(make([]byte, 0, maxLineBytes), maxLineBytes)
 			for sc.Scan() {
 				s.Verdicts++
 			}
+			serr := sc.Err()
 			f.Close()
+			if serr != nil {
+				return nil, fmt.Errorf("verdicts.jsonl for %s: %w", name, serr)
+			}
 		}
 		out = append(out, s)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
 }

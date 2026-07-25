@@ -162,3 +162,21 @@ func TestFailedCallValidates(t *testing.T) {
 		t.Fatal("successful call without raw must fail validation")
 	}
 }
+
+func TestCallRecordImageRefValidation(t *testing.T) {
+	c := validCallRecord()
+	c.Images[0].SHA256 = ""
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "images[0]") {
+		t.Fatalf("want images[0] error, got %v", err)
+	}
+	c = validCallRecord()
+	c.Images[0].W = 0
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "images[0]") {
+		t.Fatalf("want images[0] dimension error, got %v", err)
+	}
+	c = validCallRecord()
+	c.Images[0].AspectActual = ""
+	if err := c.Validate(); err == nil || !strings.Contains(err.Error(), "images[0]") {
+		t.Fatalf("want images[0] aspect_actual error, got %v", err)
+	}
+}
