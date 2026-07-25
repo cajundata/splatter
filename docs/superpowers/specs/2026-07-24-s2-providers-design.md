@@ -56,8 +56,8 @@ As specified in spec §6.1 (`Provider`, `Capabilities`, `Request`, `Result`) —
 ### Gemini (`internal/provider/gemini`)
 
 - SDK: `google.golang.org/genai`. Starshp's `gemini.go` is pattern reference only (image-mode config: `responseModalities` TEXT+IMAGE, no tools alongside image output, `InlineData` parsing; parameter-injected auth and injectable base URL). No Starshp imports, no streaming shape.
-- Aspect map: `square`→`1:1`, `portrait_4_5`→`4:5`, `portrait_2_3`→`2:3`, `landscape_4_3`→`4:3` via generation-config `aspectRatio`.
-- `Capabilities{Img2Img: false, Edit: false, Seed: false, MaxBatch: 1, AspectModes: ["1:1","4:5","2:3","4:3"]}`. MaxBatch 1 is honest: the API returns one image per call for this model; `-n 4` fails the capability check instead of silently looping.
+- Aspect map: `square`→`1:1`, `portrait_4_5`→`3:4` (the API's supported ratios include no `4:5`; `3:4` is nearest-native per spec §6.1), `portrait_2_3`→`2:3`, `landscape_4_3`→`4:3` via `GenerateContentConfig.ImageConfig.AspectRatio`.
+- `Capabilities{Img2Img: false, Edit: false, Seed: false, MaxBatch: 1, AspectModes: ["1:1","3:4","2:3","4:3"]}`. MaxBatch 1 is honest: the API returns one image per call for this model; `-n 4` fails the capability check instead of silently looping.
 - Cost: the API reports no dollar figure → `table:` or `unavailable`, never fabricated.
 - Base URL injectable (genai `HTTPOptions`) for httptest.
 
