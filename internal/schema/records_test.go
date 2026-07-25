@@ -78,7 +78,7 @@ func TestValidateCatchesMissingRequired(t *testing.T) {
 	}
 	h = validRunHeader()
 	h.V = 0
-	if err := h.Validate(); err == nil || !strings.Contains(err.Error(), "v") {
+	if err := h.Validate(); err == nil || !strings.Contains(err.Error(), "invalid v: want 1") {
 		t.Fatalf("want v error, got %v", err)
 	}
 	c := validCallRecord()
@@ -98,6 +98,52 @@ func TestValidateCatchesMissingRequired(t *testing.T) {
 	q := Critique{V: 1, Run: "", Rubric: "rubric_v1"}
 	if err := q.Validate(); err == nil || !strings.Contains(err.Error(), "run") {
 		t.Fatalf("want run error, got %v", err)
+	}
+}
+
+func TestRunHeaderLineage(t *testing.T) {
+	parent := "r_0000"
+	rel := "textual-refinement-of"
+	h := validRunHeader()
+	h.ParentRun, h.Relationship = &parent, &rel
+	if err := h.Validate(); err != nil {
+		t.Fatalf("valid lineage must pass: %v", err)
+	}
+	h = validRunHeader()
+	h.Relationship = &rel // relationship without parent_run
+	if err := h.Validate(); err == nil || !strings.Contains(err.Error(), "parent_run") {
+		t.Fatalf("want parent_run pairing error, got %v", err)
+	}
+	h = validRunHeader()
+	h.ParentRun = &parent // parent_run without relationship
+	if err := h.Validate(); err == nil || !strings.Contains(err.Error(), "relationship") {
+		t.Fatalf("want relationship pairing error, got %v", err)
+	}
+	h = validRunHeader()
+	bad := "remix-of"
+	h.ParentRun, h.Relationship = &parent, &bad
+	if err := h.Validate(); err == nil || !strings.Contains(err.Error(), "remix-of") {
+		t.Fatalf("want invalid relationship error, got %v", err)
+	}
+}
+
+func TestValidateMiscFieldErrors(t *testing.T) {
+	h := validRunHeader()
+	h.Iteration = 0
+	if err := h.Validate(); err == nil || !strings.Contains(err.Error(), "invalid iteration: 0") {
+		t.Fatalf("want iteration error, got %v", err)
+	}
+
+	v := Verdict{V: 1, Type: "verdict", Run: "r_0001", TS: time.Now().UTC(), Session: "2026-07-24",
+		Notes: []VerdictNote{{Text: ""}}}
+	if err := v.Validate(); err == nil || !strings.Contains(err.Error(), "invalid notes[0]: text required") {
+		t.Fatalf("want notes[0] error, got %v", err)
+	}
+
+	q := Critique{V: 1, Run: "r_0001", Rubric: "rubric_v1",
+		Items: []CritiqueItem{{Image: "c_01_0", Verdict: "maybe"}}}
+	if err := q.Validate(); err == nil || !strings.Contains(err.Error(), `invalid items[0].verdict: "maybe"`) {
+		t.Fatalf("want items[0].verdict error, got %v", err)
 	}
 }
 
