@@ -19,7 +19,7 @@ func newRootCmd() *cobra.Command {
 		SilenceErrors: true,
 		Args:          usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			return cmd.Help()
 		},
 	}
 	root.PersistentFlags().BoolVar(&jsonOut, "json", false, "emit machine-readable result object on stdout")
