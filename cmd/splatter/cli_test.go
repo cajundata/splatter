@@ -2,12 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/cajundata/splatter/internal/config"
+	"github.com/cajundata/splatter/internal/provider"
 )
 
 // runCLI executes the CLI in-process with dir as working directory,
@@ -196,5 +203,118 @@ func TestStatusJSON(t *testing.T) {
 	}
 	if res.Sync != "not configured" || len(res.Projects) != 1 || res.Projects[0].Name != "p1" {
 		t.Fatalf("bad result: %+v", res)
+	}
+}
+
+type cliFakeProvider struct {
+	fail bool
+}
+
+func (f *cliFakeProvider) Name() string { return "fake" }
+func (f *cliFakeProvider) Capabilities() provider.Capabilities {
+	return provider.Capabilities{MaxBatch: 4}
+}
+func (f *cliFakeProvider) Generate(ctx context.Context, req provider.Request) (provider.Result, error) {
+	if f.fail {
+		return provider.Result{Latency: time.Millisecond, Raw: []byte(`{"error":"boom"}`),
+				Meta: provider.CallMeta{HTTPStatus: 500}},
+			&provider.Error{Stage: "request", HTTPStatus: 500, Message: "boom"}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		return provider.Result{}, err
+	}
+	return provider.Result{
+		Images:       []provider.Image{{Bytes: buf.Bytes(), W: 2, H: 2}},
+		Latency:      5 * time.Millisecond,
+		Meta:         provider.CallMeta{ModelReturned: "fake-model", HTTPStatus: 200},
+		Raw:          []byte(`{"ok":true}`),
+		AspectActual: "1:1",
+	}, nil
+}
+
+func withFakeProvider(t *testing.T, fake provider.Provider) {
+	t.Helper()
+	orig := buildProvider
+	buildProvider = func(prof config.Profile) (provider.Provider, error) { return fake, nil }
+	t.Cleanup(func() { buildProvider = orig })
+}
+
+func setupGenWorkspace(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if _, err := runCLI(t, dir, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCLI(t, dir, "init", "gradient-descent"); err != nil {
+		t.Fatal(err)
+	}
+	brief := "---\nid: b_001\nproject: gradient-descent\nconcept: c\naspect: square\n---\nprose\n"
+	p := filepath.Join(dir, "projects", "gradient-descent", "briefs", "b_001.md")
+	if err := os.WriteFile(p, []byte(brief), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestGenSuccessJSON(t *testing.T) {
+	withFakeProvider(t, &cliFakeProvider{})
+	dir := setupGenWorkspace(t)
+	out, err := runCLI(t, dir, "gen", "--brief", "projects/gradient-descent/briefs/b_001.md",
+		"--profile", "gemini-baseline", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res struct {
+		Run    string `json:"run"`
+		Failed bool   `json:"failed"`
+		Images []struct {
+			File string `json:"file"`
+		} `json:"images"`
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatalf("stdout not JSON: %v\n%q", err, out)
+	}
+	if res.Run != "r_0001" || res.Failed || len(res.Images) != 1 {
+		t.Fatalf("result: %+v", res)
+	}
+	// validate accepts the evidence gen wrote
+	if _, err := runCLI(t, dir, "validate"); err != nil {
+		t.Fatalf("workspace must validate after gen: %v", err)
+	}
+}
+
+func TestGenProviderFailureExitsOne(t *testing.T) {
+	withFakeProvider(t, &cliFakeProvider{fail: true})
+	dir := setupGenWorkspace(t)
+	_, err := runCLI(t, dir, "gen", "--brief", "projects/gradient-descent/briefs/b_001.md",
+		"--profile", "gemini-baseline")
+	if err == nil {
+		t.Fatal("failed call must exit nonzero")
+	}
+	var u usageErr
+	var v validationErr
+	if errors.As(err, &u) || errors.As(err, &v) {
+		t.Fatalf("provider failure is a runtime error (exit 1), got %T", err)
+	}
+	// evidence still written
+	if _, statErr := os.Stat(filepath.Join(dir, "projects", "gradient-descent",
+		"runs", "r_0001", "manifest.jsonl")); statErr != nil {
+		t.Fatalf("failed call must still leave a manifest: %v", statErr)
+	}
+}
+
+func TestGenUsageErrors(t *testing.T) {
+	withFakeProvider(t, &cliFakeProvider{})
+	dir := setupGenWorkspace(t)
+	_, err := runCLI(t, dir, "gen", "--brief", "projects/gradient-descent/briefs/b_001.md",
+		"--profile", "nope")
+	var u usageErr
+	if !errors.As(err, &u) {
+		t.Fatalf("unknown profile: want usageErr, got %v", err)
+	}
+	_, err = runCLI(t, dir, "gen", "--profile", "gemini-baseline")
+	if err == nil {
+		t.Fatal("missing --brief must error")
 	}
 }
