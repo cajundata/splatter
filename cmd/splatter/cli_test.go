@@ -105,3 +105,54 @@ func TestInitProjectOutsideWorkspaceIsUsageError(t *testing.T) {
 		t.Fatalf("want usageErr (exit 2), got %T: %v", err, err)
 	}
 }
+
+func TestValidateCleanWorkspaceExitsZero(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := runCLI(t, dir, "init"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runCLI(t, dir, "validate", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res struct {
+		OK       bool `json:"ok"`
+		Findings []struct {
+			Path    string `json:"path"`
+			Message string `json:"message"`
+		} `json:"findings"`
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatalf("stdout not JSON: %v\n%q", err, out)
+	}
+	if !res.OK || len(res.Findings) != 0 {
+		t.Fatalf("clean workspace: %+v", res)
+	}
+}
+
+func TestValidateFindingsAreValidationError(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := runCLI(t, dir, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCLI(t, dir, "init", "p1"); err != nil {
+		t.Fatal(err)
+	}
+	bad := filepath.Join(dir, "projects", "p1", "briefs", "b_001.md")
+	if err := os.WriteFile(bad, []byte("no front matter"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := runCLI(t, dir, "validate")
+	if err == nil {
+		t.Fatal("want error")
+	}
+	var v validationErr
+	if !errors.As(err, &v) {
+		t.Fatalf("want validationErr (exit 3), got %T: %v", err, err)
+	}
+	_, err = runCLI(t, dir, "validate", "--project", "nope")
+	var u usageErr
+	if !errors.As(err, &u) {
+		t.Fatalf("want usageErr for unknown project, got %T: %v", err, err)
+	}
+}
