@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -35,7 +36,10 @@ func newInitCmd() *cobra.Command {
 				var root string
 				root, err = workspace.FindRoot(cwd)
 				if err != nil {
-					return usageErr{fmt.Errorf("init %s: %w (run splatter init first)", args[0], err)}
+					if errors.Is(err, workspace.ErrNoWorkspace) {
+						return usageErr{fmt.Errorf("init %s: %w (run splatter init first)", args[0], err)}
+					}
+					return err
 				}
 				result.Root = root
 				res, err = workspace.ScaffoldProject(root, args[0])

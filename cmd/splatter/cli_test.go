@@ -18,12 +18,12 @@ func runCLI(t *testing.T, dir string, args ...string) (string, error) {
 	// reset persistent flag state between runs
 	jsonOut = false
 	root := newRootCmd()
-	var out bytes.Buffer
-	root.SetOut(&out)
-	root.SetErr(&out)
+	var outBuf, errBuf bytes.Buffer
+	root.SetOut(&outBuf)
+	root.SetErr(&errBuf)
 	root.SetArgs(args)
 	err := root.Execute()
-	return out.String(), err
+	return outBuf.String(), err
 }
 
 func TestInitScaffoldsWorkspace(t *testing.T) {
