@@ -52,9 +52,17 @@ func ReplaceFile(path string, data []byte) error {
 		os.Remove(tmpName)
 		return err
 	}
+	if err := os.Chmod(tmpName, 0o644); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		os.Remove(tmpName)
 		return err
 	}
-	return os.Rename(tmpName, path)
+	if err := os.Rename(tmpName, path); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	return nil
 }

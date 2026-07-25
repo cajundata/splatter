@@ -84,3 +84,17 @@ func TestReplaceFileLeavesNoTempLitter(t *testing.T) {
 		t.Fatalf("want only sheet.html, got %s", strings.Join(names, ", "))
 	}
 }
+
+func TestReplaceFileProducesReadableMode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sheet.html")
+	if err := ReplaceFile(path, []byte("content")); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o644 {
+		t.Fatalf("want 0644, got %o", got)
+	}
+}
