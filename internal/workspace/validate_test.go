@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -187,6 +188,12 @@ func TestValidateFindsCorruption(t *testing.T) {
 			f.WriteString(`{"v":1,"type":"verdict"}` + "\n")
 			f.Close()
 		}, "missing required field"},
+		{"empty manifest", func(t *testing.T, root, proj string) {
+			p := filepath.Join(proj, "runs", "r_0001", "manifest.jsonl")
+			if err := os.WriteFile(p, nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}, "no run header"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -222,8 +229,12 @@ func TestValidateMissingImageFileIsNotAFinding(t *testing.T) {
 
 func TestValidateUnknownProjectErrors(t *testing.T) {
 	root := buildFixture(t)
-	if _, err := Validate(root, "no-such-project"); err == nil {
+	_, err := Validate(root, "no-such-project")
+	if err == nil {
 		t.Fatal("want error for unknown project")
+	}
+	if !errors.Is(err, ErrProjectNotFound) {
+		t.Fatalf("want ErrProjectNotFound, got %v", err)
 	}
 }
 

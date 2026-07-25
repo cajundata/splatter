@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,6 +18,10 @@ type Finding struct {
 	Path    string `json:"path"`
 	Message string `json:"message"`
 }
+
+// ErrProjectNotFound is wrapped into the error returned by Validate/
+// projectNames when a named --project doesn't exist under projects/.
+var ErrProjectNotFound = errors.New("project not found")
 
 // Validate walks every project (or just the named one) and returns all
 // findings. The error return is reserved for I/O failures.
@@ -39,7 +44,7 @@ func Validate(root, project string) ([]Finding, error) {
 func projectNames(root, only string) ([]string, error) {
 	if only != "" {
 		if fi, err := os.Stat(filepath.Join(root, "projects", only)); err != nil || !fi.IsDir() {
-			return nil, fmt.Errorf("project %q not found", only)
+			return nil, fmt.Errorf("project %q: %w", only, ErrProjectNotFound)
 		}
 		return []string{only}, nil
 	}
@@ -136,6 +141,8 @@ func validateProject(root, name string) ([]Finding, error) {
 				runImages[header.Run] = map[string]bool{}
 			}
 			checkBriefHash(proj, header, add)
+		} else {
+			add(mp, "manifest has no run header")
 		}
 	}
 
@@ -144,6 +151,7 @@ func validateProject(root, name string) ([]Finding, error) {
 	if f, err := os.Open(vp); err == nil {
 		lineNo := 0
 		sc := bufio.NewScanner(f)
+		sc.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 		for sc.Scan() {
 			lineNo++
 			if _, err := schema.DecodeVerdictLine(sc.Bytes()); err != nil {

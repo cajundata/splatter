@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -32,7 +33,7 @@ func newValidateCmd() *cobra.Command {
 			}
 			findings, err := workspace.Validate(root, project)
 			if err != nil {
-				if strings.Contains(err.Error(), "not found") {
+				if errors.Is(err, workspace.ErrProjectNotFound) {
 					return usageErr{err}
 				}
 				return err
