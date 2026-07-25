@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +30,7 @@ func newRootCmd() *cobra.Command {
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		return usageErr{err}
 	})
+	root.AddCommand(newInitCmd())
 	return root
 }
 
@@ -40,4 +44,16 @@ func usageArgs(fn cobra.PositionalArgs) cobra.PositionalArgs {
 		}
 		return nil
 	}
+}
+
+// emit is every command's single output path: the result object as JSON
+// when --json is set, the human rendering otherwise. Logs go to stderr;
+// only results go to stdout.
+func emit(cmd *cobra.Command, result any, human string) error {
+	if jsonOut {
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		return enc.Encode(result)
+	}
+	_, err := fmt.Fprint(cmd.OutOrStdout(), human)
+	return err
 }
