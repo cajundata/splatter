@@ -62,8 +62,8 @@ func (a *Adapter) Generate(ctx context.Context, req provider.Request) (provider.
 	if !ok {
 		return zero, configErr("unsupported aspect %q", req.Aspect)
 	}
-	if req.N > 1 {
-		return zero, configErr("n=%d exceeds max batch 1", req.N)
+	if req.N < 1 || req.N > 1 {
+		return zero, configErr("n=%d outside batch range 1..1", req.N)
 	}
 	if req.Seed != nil {
 		return zero, configErr("seed not supported")
@@ -141,12 +141,8 @@ func (a *Adapter) Generate(ctx context.Context, req provider.Request) (provider.
 // normalize maps a genai SDK error to the per-adapter normalized form.
 func normalize(err error, status int) *provider.Error {
 	var apiErr genai.APIError
-	if ok := errorsAs(err, &apiErr); ok {
+	if errors.As(err, &apiErr) {
 		return &provider.Error{Stage: "request", HTTPStatus: apiErr.Code, Message: apiErr.Message}
 	}
 	return &provider.Error{Stage: "request", HTTPStatus: status, Message: err.Error()}
-}
-
-func errorsAs[T error](err error, target *T) bool {
-	return errors.As(err, target)
 }

@@ -49,11 +49,11 @@ func TestLoadProviders(t *testing.T) {
 
 func TestLoadProvidersRejectsBadConfig(t *testing.T) {
 	cases := map[string]struct{ content, wantSubstr string }{
-		"bad version":     {"version: 2\nprofiles: { }\n", "version"},
+		"bad version":      {"version: 2\nprofiles: { }\n", "version"},
 		"unknown provider": {"version: 1\nprofiles:\n  x:\n    provider: dalle\n    model: m\n", "dalle"},
-		"missing model":   {"version: 1\nprofiles:\n  x:\n    provider: gemini\n", "model"},
-		"dangling set":    {"version: 1\nprofiles: { }\nprofile_sets:\n  s: [nope]\n", "nope"},
-		"malformed yaml":  {"version: [1\n", "yaml"},
+		"missing model":    {"version: 1\nprofiles:\n  x:\n    provider: gemini\n", "model"},
+		"dangling set":     {"version: 1\nprofiles: { }\nprofile_sets:\n  s: [nope]\n", "nope"},
+		"malformed yaml":   {"version: [1\n", "yaml"},
 	}
 	for name, tc := range cases {
 		_, err := LoadProviders(writeFile(t, "providers.yaml", tc.content))

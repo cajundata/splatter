@@ -73,3 +73,10 @@ func TestRedactRawNonJSONVerbatim(t *testing.T) {
 		t.Fatal("non-JSON must pass through verbatim")
 	}
 }
+
+func TestRedactRawTrailingGarbageVerbatim(t *testing.T) {
+	in := []byte(`{"a":1}garbage-tail`)
+	if string(RedactRaw(in)) != string(in) {
+		t.Fatal("input with trailing garbage must pass through verbatim")
+	}
+}

@@ -40,8 +40,11 @@ type GenResult struct {
 }
 
 // Gen runs one generation call end to end and writes all evidence. A
-// provider failure produces a failed-call record and Failed=true, not an
-// error; the error return means no evidence could be written at all.
+// config-stage provider error (missing API key, unsupported native key,
+// etc.) never reaches the wire, so Gen returns it as a plain error with no
+// evidence written at all — no run allocated, nothing on disk. A request-
+// or decode-stage failure did reach the wire, so it produces a
+// failed-call record (Failed=true) instead of a Gen error.
 func Gen(ctx context.Context, p GenParams) (*GenResult, error) {
 	briefBytes, err := os.ReadFile(p.BriefPath)
 	if err != nil {
@@ -72,7 +75,7 @@ func Gen(ctx context.Context, p GenParams) (*GenResult, error) {
 	}
 	briefRel, err := filepath.Rel(resolvedProj, absBrief)
 	if err != nil || briefRel == ".." || strings.HasPrefix(briefRel, ".."+string(filepath.Separator)) {
-		return nil, fmt.Errorf("brief %s must live under %s", p.BriefPath, filepath.Join(projDir, "briefs"))
+		return nil, fmt.Errorf("brief %s must live under project dir %s", p.BriefPath, projDir)
 	}
 
 	// Capability checks: planning time, before any wire call or disk write.
@@ -84,7 +87,25 @@ func Gen(ctx context.Context, p GenParams) (*GenResult, error) {
 		return nil, fmt.Errorf("n=%d exceeds provider %s max batch %d", p.N, p.Provider.Name(), caps.MaxBatch)
 	}
 
-	// All validation is now complete; only disk mutation follows.
+	// All pre-checks are complete; call the provider before touching disk.
+	// A config-stage failure never reaches the wire, so nothing has been
+	// allocated yet and there is nothing on disk to clean up on that path.
+	callID := "c_01"
+	req := provider.Request{
+		Model:  p.Profile.Model,
+		Prompt: strings.TrimSpace(meta.Concept + "\n\n" + body),
+		N:      p.N,
+		Aspect: meta.Aspect,
+		Native: p.Profile.Native,
+	}
+	res, genErr := p.Provider.Generate(ctx, req)
+	if pe, ok := genErr.(*provider.Error); ok && pe.Stage == "config" {
+		return nil, genErr
+	}
+
+	// Everything from here on is disk mutation: the call has either
+	// succeeded or failed at request/decode stage, both of which reached
+	// the wire and must leave evidence behind.
 	runID, runDir, err := allocateRun(projDir)
 	if err != nil {
 		return nil, err
@@ -104,16 +125,6 @@ func Gen(ctx context.Context, p GenParams) (*GenResult, error) {
 	if err := fsio.AppendRecord(manifest, header); err != nil {
 		return nil, err
 	}
-
-	callID := "c_01"
-	req := provider.Request{
-		Model:  p.Profile.Model,
-		Prompt: strings.TrimSpace(meta.Concept + "\n\n" + body),
-		N:      p.N,
-		Aspect: meta.Aspect,
-		Native: p.Profile.Native,
-	}
-	res, genErr := p.Provider.Generate(ctx, req)
 
 	// Sidecar: written for success AND wire failures (evidence either way).
 	rawRel := ""
@@ -141,6 +152,7 @@ func Gen(ctx context.Context, p GenParams) (*GenResult, error) {
 	result := &GenResult{Project: meta.Project, Run: runID, Call: callID, LatencyMS: res.Latency.Milliseconds()}
 	if genErr != nil {
 		record.Error = callErrorFrom(genErr)
+		record.Images = []schema.ImageRef{}
 		record.Cost = ResolveCost(res.Cost, res.Meta.ModelReturned, p.Profile.Model, 0, p.Pricing)
 		result.Failed, result.Error, result.Cost = true, record.Error, record.Cost
 		if err := fsio.AppendRecord(manifest, record); err != nil {

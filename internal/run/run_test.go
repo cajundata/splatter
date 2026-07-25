@@ -214,6 +214,25 @@ func TestGenProviderFailureWritesFailedRecord(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(runDir, "raw", "c_01.json")); err != nil {
 		t.Fatalf("failure sidecar: %v", err)
 	}
+	if !bytes.Contains(lines[1], []byte(`"images":[]`)) {
+		t.Fatalf("failed record must serialize images as [], not null: %s", lines[1])
+	}
+}
+
+func TestGenConfigStageFailureLeavesNoTrace(t *testing.T) {
+	root, briefPath := setupWorkspace(t)
+	fake := &fakeProvider{
+		caps: provider.Capabilities{MaxBatch: 4},
+		err:  &provider.Error{Stage: "config", Message: "missing FAKE_API_KEY"},
+	}
+	_, err := Gen(context.Background(), genParams(root, briefPath, fake))
+	if err == nil || !strings.Contains(err.Error(), "missing FAKE_API_KEY") {
+		t.Fatalf("config-stage failure must be a Gen error, got %v", err)
+	}
+	entries, _ := os.ReadDir(filepath.Join(root, "projects", "gradient-descent", "runs"))
+	if len(entries) != 0 {
+		t.Fatalf("config-stage failure must leave no run dirs: %v", entries)
+	}
 }
 
 func TestGenCapabilityViolationLeavesNoTrace(t *testing.T) {

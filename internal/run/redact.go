@@ -24,6 +24,9 @@ func RedactRaw(raw []byte) []byte {
 	if err := dec.Decode(&v); err != nil {
 		return raw
 	}
+	if dec.More() {
+		return raw // trailing content: preserve the original bytes verbatim
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)

@@ -122,6 +122,7 @@ func TestGenerateConfigErrors(t *testing.T) {
 	}{
 		{"bad aspect", provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "wide"}, "aspect"},
 		{"n over max", provider.Request{Model: "m", Prompt: "p", N: 2, Aspect: "square"}, "batch"},
+		{"n zero", provider.Request{Model: "m", Prompt: "p", N: 0, Aspect: "square"}, "batch"},
 		{"seed unsupported", provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square",
 			Seed: ptr(int64(7))}, "seed"},
 		{"unknown native", provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square",
