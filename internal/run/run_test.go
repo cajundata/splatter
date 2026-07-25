@@ -245,3 +245,32 @@ func TestGenUnscaffoldedProjectErrors(t *testing.T) {
 		t.Fatalf("want unscaffolded-project error, got %v", err)
 	}
 }
+
+func TestGenRelativeBriefPath(t *testing.T) {
+	root, _ := setupWorkspace(t)
+	t.Chdir(root)
+	p := genParams(root, filepath.Join("projects", "gradient-descent", "briefs", "b_001.md"), successProvider(t))
+	res, err := Gen(context.Background(), p)
+	if err != nil {
+		t.Fatalf("cwd-relative brief path must work: %v", err)
+	}
+	if res.Run != "r_0001" {
+		t.Fatalf("result: %+v", res)
+	}
+}
+
+func TestGenBriefOutsideProjectLeavesNoTrace(t *testing.T) {
+	root, _ := setupWorkspace(t)
+	outside := filepath.Join(root, "stray-brief.md")
+	if err := os.WriteFile(outside, []byte(genBrief), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Gen(context.Background(), genParams(root, outside, successProvider(t)))
+	if err == nil || !strings.Contains(err.Error(), "must live under") {
+		t.Fatalf("want containment error, got %v", err)
+	}
+	entries, _ := os.ReadDir(filepath.Join(root, "projects", "gradient-descent", "runs"))
+	if len(entries) != 0 {
+		t.Fatalf("rejected brief must leave no run dirs: %v", entries)
+	}
+}

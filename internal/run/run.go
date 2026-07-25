@@ -56,6 +56,25 @@ func Gen(ctx context.Context, p GenParams) (*GenResult, error) {
 		return nil, fmt.Errorf("project %q not scaffolded (run: splatter init %s)", meta.Project, meta.Project)
 	}
 
+	// Brief-under-project containment check. Absolutize p.BriefPath first
+	// (it may be cwd-relative) and resolve symlinks on both sides so
+	// containment survives symlinked roots (e.g. macOS /tmp).
+	absBrief, err := filepath.Abs(p.BriefPath)
+	if err != nil {
+		return nil, err
+	}
+	if r, err := filepath.EvalSymlinks(absBrief); err == nil {
+		absBrief = r
+	}
+	resolvedProj := projDir
+	if r, err := filepath.EvalSymlinks(projDir); err == nil {
+		resolvedProj = r
+	}
+	briefRel, err := filepath.Rel(resolvedProj, absBrief)
+	if err != nil || briefRel == ".." || strings.HasPrefix(briefRel, ".."+string(filepath.Separator)) {
+		return nil, fmt.Errorf("brief %s must live under %s", p.BriefPath, filepath.Join(projDir, "briefs"))
+	}
+
 	// Capability checks: planning time, before any wire call or disk write.
 	caps := p.Provider.Capabilities()
 	if p.N < 1 {
@@ -65,6 +84,7 @@ func Gen(ctx context.Context, p GenParams) (*GenResult, error) {
 		return nil, fmt.Errorf("n=%d exceeds provider %s max batch %d", p.N, p.Provider.Name(), caps.MaxBatch)
 	}
 
+	// All validation is now complete; only disk mutation follows.
 	runID, runDir, err := allocateRun(projDir)
 	if err != nil {
 		return nil, err
@@ -75,12 +95,6 @@ func Gen(ctx context.Context, p GenParams) (*GenResult, error) {
 		}
 	}
 
-	briefRel, err := filepath.Rel(projDir, p.BriefPath)
-	if err != nil || strings.HasPrefix(briefRel, "..") {
-		// brief outside the project dir: store slash-cleaned absolute-ish
-		// fallback is not allowed; require in-project briefs.
-		return nil, fmt.Errorf("brief %s must live under %s", p.BriefPath, filepath.Join(projDir, "briefs"))
-	}
 	header := schema.RunHeader{
 		V: 1, Type: "run", Run: runID, Project: meta.Project,
 		Brief: filepath.ToSlash(briefRel), BriefSHA256: schema.BriefSHA256(briefBytes),
