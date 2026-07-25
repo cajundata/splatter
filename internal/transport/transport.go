@@ -38,6 +38,7 @@ func (rt roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	start := time.Now()
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	rt.rec.latency = time.Since(start)
+	rt.rec.body, rt.rec.status, rt.rec.requestID = nil, 0, ""
 	if err != nil {
 		return nil, err
 	}

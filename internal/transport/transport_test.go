@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -44,7 +45,7 @@ func TestRecorderKeepsLastExchange(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n++
 		w.WriteHeader(200)
-		io.WriteString(w, "resp")
+		io.WriteString(w, fmt.Sprintf("resp-%d", n))
 	}))
 	defer srv.Close()
 
@@ -57,7 +58,7 @@ func TestRecorderKeepsLastExchange(t *testing.T) {
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 	}
-	if n != 2 || string(rec.Body()) != "resp" || rec.HTTPStatus() != 200 {
+	if n != 2 || string(rec.Body()) != "resp-2" || rec.HTTPStatus() != 200 {
 		t.Fatalf("n=%d body=%q", n, rec.Body())
 	}
 }
@@ -84,5 +85,29 @@ func TestRecorderStoresNoRequestHeaders(t *testing.T) {
 	}
 	if rec.RequestID() != "" {
 		t.Fatal("no request id expected")
+	}
+}
+
+func TestRecorderResetsOnTrailingFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		io.WriteString(w, "good")
+	}))
+	rec, client := NewRecorder("")
+	resp, err := client.Get(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	srv.Close() // next exchange fails at the transport level
+	if _, err := client.Get(srv.URL); err == nil {
+		t.Fatal("want transport error")
+	}
+	if rec.Body() != nil || rec.HTTPStatus() != 0 || rec.RequestID() != "" {
+		t.Fatalf("recorder must describe the last (failed) exchange: body=%q status=%d", rec.Body(), rec.HTTPStatus())
+	}
+	if rec.Latency() <= 0 {
+		t.Fatal("latency of failed exchange still recorded")
 	}
 }
