@@ -156,3 +156,30 @@ func TestValidateFindingsAreValidationError(t *testing.T) {
 		t.Fatalf("want usageErr for unknown project, got %T: %v", err, err)
 	}
 }
+
+func TestStatusJSON(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := runCLI(t, dir, "init"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCLI(t, dir, "init", "p1"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runCLI(t, dir, "status", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res struct {
+		Root     string `json:"root"`
+		Sync     string `json:"sync"`
+		Projects []struct {
+			Name string `json:"name"`
+		} `json:"projects"`
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatalf("stdout not JSON: %v\n%q", err, out)
+	}
+	if res.Sync != "not configured" || len(res.Projects) != 1 || res.Projects[0].Name != "p1" {
+		t.Fatalf("bad result: %+v", res)
+	}
+}
