@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"image"
 	"image/png"
 	"os"
@@ -207,8 +208,11 @@ func TestStatusJSON(t *testing.T) {
 }
 
 type cliFakeProvider struct {
-	fail bool
+	fail         bool
+	preflightErr error
 }
+
+func (f *cliFakeProvider) Preflight(req provider.Request) error { return f.preflightErr }
 
 func (f *cliFakeProvider) Name() string { return "fake" }
 func (f *cliFakeProvider) Capabilities() provider.Capabilities {
@@ -237,6 +241,20 @@ func withFakeProvider(t *testing.T, fake provider.Provider) {
 	t.Helper()
 	orig := buildProvider
 	buildProvider = func(prof config.Profile) (provider.Provider, error) { return fake, nil }
+	t.Cleanup(func() { buildProvider = orig })
+}
+
+// withFakeProvidersByName routes buildProvider through fakes keyed by
+// the profile's provider name, so a fan can mix outcomes per profile.
+func withFakeProvidersByName(t *testing.T, fakes map[string]provider.Provider) {
+	t.Helper()
+	orig := buildProvider
+	buildProvider = func(prof config.Profile) (provider.Provider, error) {
+		if f, ok := fakes[prof.Provider]; ok {
+			return f, nil
+		}
+		return nil, fmt.Errorf("no fake for provider %q", prof.Provider)
+	}
 	t.Cleanup(func() { buildProvider = orig })
 }
 
@@ -327,5 +345,121 @@ func TestGenMissingBriefFileIsUsageError(t *testing.T) {
 	var u usageErr
 	if !errors.As(err, &u) {
 		t.Fatalf("nonexistent brief: want usageErr (exit 2), got %T: %v", err, err)
+	}
+}
+
+func TestFanSetSuccessJSON(t *testing.T) {
+	withFakeProvidersByName(t, map[string]provider.Provider{
+		"gemini": &cliFakeProvider{}, "openai": &cliFakeProvider{},
+	})
+	dir := setupGenWorkspace(t)
+	out, err := runCLI(t, dir, "fan", "--brief", "projects/gradient-descent/briefs/b_001.md",
+		"--set", "baseline", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res struct {
+		Run   string `json:"run"`
+		Calls []struct {
+			Call    string `json:"call"`
+			Profile string `json:"profile"`
+			Failed  bool   `json:"failed"`
+		} `json:"calls"`
+		Succeeded int `json:"succeeded"`
+		Failed    int `json:"failed"`
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatalf("stdout not JSON: %v\n%q", err, out)
+	}
+	if res.Run != "r_0001" || res.Succeeded != 2 || res.Failed != 0 || len(res.Calls) != 2 {
+		t.Fatalf("result: %+v", res)
+	}
+	if res.Calls[0].Call != "c_01" || res.Calls[1].Call != "c_02" ||
+		res.Calls[0].Profile != "gemini-baseline" || res.Calls[1].Profile != "openai-baseline" {
+		t.Fatalf("calls out of order: %+v", res.Calls)
+	}
+	if _, err := runCLI(t, dir, "validate"); err != nil {
+		t.Fatalf("workspace must validate after fan: %v", err)
+	}
+}
+
+func TestFanMixedFailureExitsZero(t *testing.T) {
+	withFakeProvidersByName(t, map[string]provider.Provider{
+		"gemini": &cliFakeProvider{}, "openai": &cliFakeProvider{fail: true},
+	})
+	dir := setupGenWorkspace(t)
+	out, err := runCLI(t, dir, "fan", "--brief", "projects/gradient-descent/briefs/b_001.md",
+		"--set", "baseline", "--json")
+	if err != nil {
+		t.Fatalf("one success means exit 0: %v", err)
+	}
+	var res struct {
+		Succeeded int `json:"succeeded"`
+		Failed    int `json:"failed"`
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.Succeeded != 1 || res.Failed != 1 {
+		t.Fatalf("result: %+v", res)
+	}
+}
+
+func TestFanAllFailedExitsOne(t *testing.T) {
+	withFakeProvidersByName(t, map[string]provider.Provider{
+		"gemini": &cliFakeProvider{fail: true}, "openai": &cliFakeProvider{fail: true},
+	})
+	dir := setupGenWorkspace(t)
+	_, err := runCLI(t, dir, "fan", "--brief", "projects/gradient-descent/briefs/b_001.md",
+		"--set", "baseline")
+	if err == nil {
+		t.Fatal("all-failed fan must exit nonzero")
+	}
+	var u usageErr
+	var v validationErr
+	if errors.As(err, &u) || errors.As(err, &v) {
+		t.Fatalf("all-failed is a runtime error (exit 1), got %T", err)
+	}
+}
+
+func TestFanPreflightFailureExitsOneWithNoTrace(t *testing.T) {
+	withFakeProvidersByName(t, map[string]provider.Provider{
+		"gemini": &cliFakeProvider{},
+		"openai": &cliFakeProvider{preflightErr: &provider.Error{Stage: "config", Message: "missing OPENAI_API_KEY"}},
+	})
+	dir := setupGenWorkspace(t)
+	_, err := runCLI(t, dir, "fan", "--brief", "projects/gradient-descent/briefs/b_001.md",
+		"--set", "baseline")
+	if err == nil || !strings.Contains(err.Error(), "OPENAI_API_KEY") {
+		t.Fatalf("want pre-flight error, got %v", err)
+	}
+	var u usageErr
+	if errors.As(err, &u) {
+		t.Fatalf("pre-flight failure is a runtime error (exit 1), got usageErr")
+	}
+	entries, _ := os.ReadDir(filepath.Join(dir, "projects", "gradient-descent", "runs"))
+	if len(entries) != 0 {
+		t.Fatalf("pre-flight failure must leave no run dirs: %v", entries)
+	}
+}
+
+func TestFanFlagMisuseIsUsageError(t *testing.T) {
+	withFakeProvider(t, &cliFakeProvider{})
+	dir := setupGenWorkspace(t)
+	brief := "projects/gradient-descent/briefs/b_001.md"
+	cases := [][]string{
+		{"fan", "--brief", brief}, // neither
+		{"fan", "--brief", brief, "--set", "baseline", "--profiles", "a"},                   // both
+		{"fan", "--brief", brief, "--set", "nope"},                                          // unknown set
+		{"fan", "--brief", brief, "--profiles", "nope"},                                     // unknown profile
+		{"fan", "--set", "baseline"},                                                        // missing brief
+		{"fan", "--brief", "projects/gradient-descent/briefs/nope.md", "--set", "baseline"}, // nonexistent brief
+	}
+	for _, args := range cases {
+		_, err := runCLI(t, dir, args...)
+		var u usageErr
+		if !errors.As(err, &u) {
+			t.Fatalf("%v: want usageErr, got %T: %v", args, err, err)
+		}
 	}
 }
