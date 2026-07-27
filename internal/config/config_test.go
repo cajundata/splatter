@@ -86,6 +86,22 @@ func TestResolveErrorCarriesProvidersPath(t *testing.T) {
 	}
 }
 
+func TestResolveSet(t *testing.T) {
+	path := writeFile(t, "providers.yaml", goodProviders)
+	p, err := LoadProviders(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	members, err := p.ResolveSet("baseline")
+	if err != nil || len(members) != 2 {
+		t.Fatalf("baseline: %v, %v", members, err)
+	}
+	_, err = p.ResolveSet("nope")
+	if err == nil || !strings.Contains(err.Error(), "baseline") || !strings.Contains(err.Error(), path) {
+		t.Fatalf("unknown set must list available sets and carry the path, got %v", err)
+	}
+}
+
 func TestLoadPricing(t *testing.T) {
 	good := "version: \"2026-07-25.0\"\nmodels:\n  gpt-image-1:\n    usd_per_image: 0.04\n"
 	pr, err := LoadPricing(writeFile(t, "pricing.yaml", good))

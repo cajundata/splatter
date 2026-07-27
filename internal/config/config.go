@@ -90,6 +90,22 @@ func (p *Providers) source() string {
 	return p.path
 }
 
+// ResolveSet returns the member profile IDs of a profile set, in
+// providers.yaml order.
+func (p *Providers) ResolveSet(set string) ([]string, error) {
+	members, ok := p.ProfileSets[set]
+	if !ok {
+		names := make([]string, 0, len(p.ProfileSets))
+		for n := range p.ProfileSets {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		return nil, fmt.Errorf("%s: unknown profile set %q (available: %s)",
+			p.source(), set, strings.Join(names, ", "))
+	}
+	return members, nil
+}
+
 func (p *Providers) Resolve(profileID string) (Profile, error) {
 	prof, ok := p.Profiles[profileID]
 	if !ok {
