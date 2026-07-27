@@ -189,6 +189,39 @@ func TestGenerateUndecodableImageIsDecodeErrorWithEvidence(t *testing.T) {
 	}
 }
 
+func TestPreflightMirrorsConfigChecks(t *testing.T) {
+	a := New("k", "")
+	bad := []struct {
+		name string
+		req  provider.Request
+		want string
+	}{
+		{"bad aspect", provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "wide"}, "aspect"},
+		{"n over max", provider.Request{Model: "m", Prompt: "p", N: 11, Aspect: "square"}, "batch"},
+		{"n under min", provider.Request{Model: "m", Prompt: "p", N: 0, Aspect: "square"}, "batch"},
+		{"seed", provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square", Seed: ptr(int64(1))}, "seed"},
+		{"unknown native", provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square",
+			Native: map[string]any{"style": "vivid"}}, "native"},
+		{"non-string quality", provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square",
+			Native: map[string]any{"quality": 7}}, "quality"},
+	}
+	for _, tc := range bad {
+		err := a.Preflight(tc.req)
+		var pe *provider.Error
+		if !errors.As(err, &pe) || pe.Stage != "config" || !strings.Contains(pe.Message, tc.want) {
+			t.Fatalf("%s: want config error containing %q, got %v", tc.name, tc.want, err)
+		}
+	}
+	if err := a.Preflight(provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square",
+		Native: map[string]any{"quality": "high"}}); err != nil {
+		t.Fatalf("valid request must preflight clean: %v", err)
+	}
+	if err := New("", "").Preflight(provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square"}); err == nil ||
+		!strings.Contains(err.Error(), "OPENAI_API_KEY") {
+		t.Fatalf("missing key must fail preflight, got %v", err)
+	}
+}
+
 func TestCapabilities(t *testing.T) {
 	c := New("k", "").Capabilities()
 	if c.MaxBatch != 10 || c.Seed || c.Img2Img || c.Edit {

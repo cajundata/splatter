@@ -49,20 +49,52 @@ func configErr(format string, args ...any) *provider.Error {
 	return &provider.Error{Stage: "config", Message: fmt.Sprintf(format, args...)}
 }
 
-func (a *Adapter) Generate(ctx context.Context, req provider.Request) (provider.Result, error) {
-	var zero provider.Result
+// validateRequest runs every config-stage check with zero network and
+// zero filesystem, returning the mapped native size and quality. Shared
+// by Generate and Preflight so a passing pre-flight means Generate
+// cannot fail at config stage.
+func (a *Adapter) validateRequest(req provider.Request) (size, quality string, err error) {
 	if a.apiKey == "" {
-		return zero, configErr("missing OPENAI_API_KEY")
+		return "", "", configErr("missing OPENAI_API_KEY")
 	}
 	native, ok := aspectMap[req.Aspect]
 	if !ok {
-		return zero, configErr("unsupported aspect %q", req.Aspect)
+		return "", "", configErr("unsupported aspect %q", req.Aspect)
 	}
 	if req.N < 1 || req.N > 10 {
-		return zero, configErr("n=%d outside batch range 1..10", req.N)
+		return "", "", configErr("n=%d outside batch range 1..10", req.N)
 	}
 	if req.Seed != nil {
-		return zero, configErr("seed not supported")
+		return "", "", configErr("seed not supported")
+	}
+	for k, v := range req.Native {
+		switch k {
+		case "quality":
+			s, ok := v.(string)
+			if !ok {
+				return "", "", configErr("native quality must be a string, got %T", v)
+			}
+			quality = s
+		default:
+			return "", "", configErr("unsupported native key %q", k)
+		}
+	}
+	return native, quality, nil
+}
+
+// Preflight runs the adapter's config-stage checks without touching the
+// network. Discovered by internal/run via type assertion; the frozen
+// Provider interface is untouched.
+func (a *Adapter) Preflight(req provider.Request) error {
+	_, _, err := a.validateRequest(req)
+	return err
+}
+
+func (a *Adapter) Generate(ctx context.Context, req provider.Request) (provider.Result, error) {
+	var zero provider.Result
+	native, quality, err := a.validateRequest(req)
+	if err != nil {
+		return zero, err
 	}
 	params := oai.ImageGenerateParams{
 		Prompt: req.Prompt,
@@ -70,17 +102,8 @@ func (a *Adapter) Generate(ctx context.Context, req provider.Request) (provider.
 		N:      oai.Int(int64(req.N)),
 		Size:   oai.ImageGenerateParamsSize(native),
 	}
-	for k, v := range req.Native {
-		switch k {
-		case "quality":
-			s, ok := v.(string)
-			if !ok {
-				return zero, configErr("native quality must be a string, got %T", v)
-			}
-			params.Quality = oai.ImageGenerateParamsQuality(s)
-		default:
-			return zero, configErr("unsupported native key %q", k)
-		}
+	if quality != "" {
+		params.Quality = oai.ImageGenerateParamsQuality(quality)
 	}
 
 	rec, client := transport.NewRecorder("X-Request-Id")
