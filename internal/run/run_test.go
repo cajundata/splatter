@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -44,6 +45,16 @@ func (f *fakeProvider) Capabilities() provider.Capabilities { return f.caps }
 func (f *fakeProvider) Generate(ctx context.Context, req provider.Request) (provider.Result, error) {
 	f.gotReq = req
 	return f.result, f.err
+}
+
+// Preflight mirrors the real adapters: the config-stage failures that
+// Generate would return are reported before any wire call.
+func (f *fakeProvider) Preflight(req provider.Request) error {
+	var pe *provider.Error
+	if errors.As(f.err, &pe) && pe.Stage == "config" {
+		return f.err
+	}
+	return nil
 }
 
 func pngBytes(t *testing.T) []byte {
