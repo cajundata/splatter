@@ -154,6 +154,41 @@ func TestGenerateEmptyDataIsDecodeError(t *testing.T) {
 	}
 }
 
+func TestGenerateBadBase64IsDecodeErrorWithEvidence(t *testing.T) {
+	srv := serve(t, 200, `{"created":1753500000,"data":[{"b64_json":"%%%not-base64%%%"}]}`, nil)
+	defer srv.Close()
+	a := New("k", srv.URL)
+	res, err := a.Generate(context.Background(), provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square"})
+	var pe *provider.Error
+	if !errors.As(err, &pe) || pe.Stage != "decode" || !strings.Contains(pe.Message, "base64") {
+		t.Fatalf("want decode error mentioning base64, got %v", err)
+	}
+	if res.Latency <= 0 || res.Meta.HTTPStatus != 200 || len(res.Raw) == 0 {
+		t.Fatalf("partial result lost evidence: %+v", res)
+	}
+	if res.Meta.ModelReturned != "m" || res.Meta.ProviderRequestID != "req_oai_1" {
+		t.Fatalf("partial result lost meta: %#v", res.Meta)
+	}
+}
+
+func TestGenerateUndecodableImageIsDecodeErrorWithEvidence(t *testing.T) {
+	notAnImage := base64.StdEncoding.EncodeToString([]byte("plainly not a png"))
+	srv := serve(t, 200, fmt.Sprintf(`{"created":1753500000,"data":[{"b64_json":"%s"}]}`, notAnImage), nil)
+	defer srv.Close()
+	a := New("k", srv.URL)
+	res, err := a.Generate(context.Background(), provider.Request{Model: "m", Prompt: "p", N: 1, Aspect: "square"})
+	var pe *provider.Error
+	if !errors.As(err, &pe) || pe.Stage != "decode" || !strings.Contains(pe.Message, "undecodable") {
+		t.Fatalf("want decode error mentioning undecodable, got %v", err)
+	}
+	if res.Latency <= 0 || res.Meta.HTTPStatus != 200 || len(res.Raw) == 0 {
+		t.Fatalf("partial result lost evidence: %+v", res)
+	}
+	if res.Meta.ModelReturned != "m" || res.Meta.ProviderRequestID != "req_oai_1" {
+		t.Fatalf("partial result lost meta: %#v", res.Meta)
+	}
+}
+
 func TestCapabilities(t *testing.T) {
 	c := New("k", "").Capabilities()
 	if c.MaxBatch != 10 || c.Seed || c.Img2Img || c.Edit {
