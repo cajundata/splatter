@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{.Project}} {{.Run}} — splatter sheet</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+         margin: 2rem; background: #fafafa; color: #222; }
+  h1 { margin-bottom: .25rem; }
+  .meta { color: #555; margin-top: 0; }
+  h2 { border-bottom: 1px solid #ddd; padding-bottom: .25rem; margin-top: 2rem; }
+  .cards { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+  .card { border: 1px solid #ddd; border-radius: 4px; background: #fff;
+          padding: .75rem; width: 340px; }
+  .card img { max-width: 100%; height: auto; display: block; border: 1px solid #eee; }
+  .badge { font-weight: 600; margin: 0 0 .5rem; }
+  .params, .evidence { color: #555; font-size: .85rem; margin: .25rem 0; }
+  .imgmeta { font-size: .85rem; margin: .25rem 0 .75rem; }
+  .critique { font-size: .85rem; color: #444; margin: 0 0 .75rem; }
+  .error { color: #a00; font-weight: 600; }
+  .status-keep { color: #070; font-weight: 700; }
+  .status-cull { color: #a00; font-weight: 700; }
+  pre { background: #f0f0f0; padding: .75rem; overflow-x: auto; }
+  footer { margin-top: 2.5rem; border-top: 1px solid #ddd; padding-top: 1rem; }
+</style>
+</head>
+<body>
+<h1>{{.Project}} / {{.Run}}</h1>
+<p class="meta">iteration {{.Iteration}}{{if .BriefID}} · brief {{.BriefID}} — {{.Concept}}{{else}} · {{.BriefNote}}{{end}}</p>
+{{range .Groups}}
+<h2>{{.Provider}}</h2>
+<div class="cards">
+{{range .Cards}}
+  <div class="card">
+    <p class="badge">{{.Model}} <small>({{.Profile}}, {{.Call}})</small></p>
+{{if .Failed}}
+    <p class="error">FAILED at {{.ErrStage}}{{if .ErrHTTPStatus}} (http {{.ErrHTTPStatus}}){{end}}: {{.ErrMessage}}</p>
+    <p class="evidence">latency {{.LatencyMS}} ms</p>
+{{else}}
+{{range .Images}}
+    <a href="{{.File}}"><img src="{{.File}}" alt="{{.ID}}"></a>
+    <p class="imgmeta">{{.ID}} · {{.W}}×{{.H}}{{if .Status}} · <span class="status-{{.Status}}">{{.Status}}</span>{{end}}</p>
+{{with .Critique}}
+    <p class="critique">critique: {{.Verdict}}{{range .Scores}} · {{.Name}} {{.Value}}{{end}}<br>{{.Reason}}</p>
+{{end}}
+{{end}}
+    <p class="params">n={{.N}} · aspect {{.AspectText}} · seed {{.SeedText}}</p>
+    <p class="evidence">latency {{.LatencyMS}} ms · {{.CostText}}</p>
+{{end}}
+  </div>
+{{end}}
+</div>
+{{end}}
+<footer>
+  <p>{{.Footer.ImageCount}} image(s) · total {{.Footer.CostText}} · total latency {{.Footer.LatencyMS}} ms</p>
+{{if .Footer.ParentLink}}
+  <p><a href="{{.Footer.ParentLink}}">parent run</a></p>
+{{end}}
+  <p>Record a verdict (edit IDs into --cull as needed):</p>
+  <pre>{{.VerdictCmd}}</pre>
+</footer>
+</body>
+</html>

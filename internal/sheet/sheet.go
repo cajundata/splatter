@@ -6,8 +6,11 @@ package sheet
 
 import (
 	"bufio"
+	_ "embed"
 	"encoding/json"
 	"fmt"
+	"html/template"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,6 +19,11 @@ import (
 	"github.com/cajundata/splatter/internal/schema"
 	"github.com/cajundata/splatter/internal/workspace"
 )
+
+//go:embed sheet.tmpl.html
+var tmplSrc string
+
+var tmpl = template.Must(template.New("sheet").Parse(tmplSrc))
 
 type Score struct {
 	Name  string
@@ -229,6 +237,12 @@ func imageCritiques(path string) (map[string]*CritiqueInfo, error) {
 		out[it.Image] = info
 	}
 	return out, nil
+}
+
+// Render executes the embedded template. The output is self-contained:
+// inline CSS, no JavaScript, relative image references only.
+func Render(w io.Writer, d *Data) error {
+	return tmpl.Execute(w, d)
 }
 
 func costText(c schema.Cost) string {
