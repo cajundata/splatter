@@ -89,10 +89,14 @@ func successProvider(t *testing.T) *fakeProvider {
 	}
 }
 
+func testProfile() config.Profile {
+	return config.Profile{Provider: "fake", Model: "fake-model", Native: map[string]any{"k": "v"}}
+}
+
 func genParams(root, briefPath string, p provider.Provider) GenParams {
 	return GenParams{
 		Root: root, BriefPath: briefPath, ProfileID: "test-profile",
-		Profile: config.Profile{Provider: "fake", Model: "fake-model", Native: map[string]any{"k": "v"}},
+		Profile: testProfile(),
 		N:       1, Harness: "splatter test",
 		Pricing: &config.Pricing{Version: "2026-07-25.0",
 			Models: map[string]config.ModelPrice{"fake-model-9": {USDPerImage: 0.05}}},
