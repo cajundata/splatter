@@ -463,3 +463,121 @@ func TestFanFlagMisuseIsUsageError(t *testing.T) {
 		}
 	}
 }
+
+// setupRunWorkspace fabricates a workspace with one completed run
+// (r_0001, image c_01_0) via the real gen path.
+func setupRunWorkspace(t *testing.T) string {
+	t.Helper()
+	withFakeProvider(t, &cliFakeProvider{})
+	dir := setupGenWorkspace(t)
+	if _, err := runCLI(t, dir, "gen", "--brief", "projects/gradient-descent/briefs/b_001.md",
+		"--profile", "gemini-baseline"); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestVerdictAppendsAndValidates(t *testing.T) {
+	dir := setupRunWorkspace(t)
+	out, err := runCLI(t, dir, "verdict", "--run", "r_0001",
+		"--keep", "c_01_0",
+		"--note", "c_01_0: tighten the glyph",
+		"--note", "solid direction overall",
+		"--session", "s3-check", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec struct {
+		V       int      `json:"v"`
+		Type    string   `json:"type"`
+		Run     string   `json:"run"`
+		Session string   `json:"session"`
+		Keep    []string `json:"keep"`
+		Cull    []string `json:"cull"`
+		Notes   []struct {
+			Image *string `json:"image"`
+			Text  string  `json:"text"`
+		} `json:"notes"`
+	}
+	if err := json.Unmarshal([]byte(out), &rec); err != nil {
+		t.Fatalf("stdout not JSON: %v\n%q", err, out)
+	}
+	if rec.V != 1 || rec.Type != "verdict" || rec.Run != "r_0001" || rec.Session != "s3-check" {
+		t.Fatalf("record: %+v", rec)
+	}
+	if len(rec.Keep) != 1 || rec.Keep[0] != "c_01_0" || len(rec.Cull) != 0 {
+		t.Fatalf("keep/cull: %+v", rec)
+	}
+	if len(rec.Notes) != 2 || rec.Notes[0].Image == nil || *rec.Notes[0].Image != "c_01_0" ||
+		rec.Notes[0].Text != "tighten the glyph" || rec.Notes[1].Image != nil {
+		t.Fatalf("notes: %+v", rec.Notes)
+	}
+	// empty cull serializes as [], never null
+	raw, err := os.ReadFile(filepath.Join(dir, "projects", "gradient-descent", "verdicts.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"cull":[]`) {
+		t.Fatalf("empty cull must serialize as []: %s", raw)
+	}
+	// the appended line decodes through the schema and validate passes
+	if _, err := runCLI(t, dir, "validate"); err != nil {
+		t.Fatalf("validate must pass after verdict: %v", err)
+	}
+}
+
+func TestVerdictSessionDefaultsToLocalDate(t *testing.T) {
+	dir := setupRunWorkspace(t)
+	out, err := runCLI(t, dir, "verdict", "--run", "r_0001", "--keep", "c_01_0", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec struct {
+		Session string `json:"session"`
+	}
+	if err := json.Unmarshal([]byte(out), &rec); err != nil {
+		t.Fatal(err)
+	}
+	if want := time.Now().Format("2006-01-02"); rec.Session != want {
+		t.Fatalf("session default: want %s, got %s", want, rec.Session)
+	}
+}
+
+func TestVerdictRejectionsAppendNothing(t *testing.T) {
+	dir := setupRunWorkspace(t)
+	cases := [][]string{
+		{"verdict", "--run", "r_0001", "--keep", "c_99_9"},                     // unknown keep id
+		{"verdict", "--run", "r_0001", "--cull", "c_99_9"},                     // unknown cull id
+		{"verdict", "--run", "r_0001", "--note", "c_99_9: unknown image note"}, // unknown note id
+		{"verdict", "--run", "r_0001", "--keep", "c_01_0", "--cull", "c_01_0"}, // overlap
+		{"verdict", "--run", "r_0001"},                                         // empty verdict
+		{"verdict", "--run", "r_0099", "--keep", "c_01_0"},                     // unknown run
+		{"verdict", "--keep", "c_01_0"},                                        // missing --run
+	}
+	for _, args := range cases {
+		_, err := runCLI(t, dir, args...)
+		var u usageErr
+		if !errors.As(err, &u) {
+			t.Fatalf("%v: want usageErr, got %T: %v", args, err, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "projects", "gradient-descent", "verdicts.jsonl")); !os.IsNotExist(err) {
+		t.Fatal("rejected verdicts must append nothing")
+	}
+}
+
+func TestVerdictAmbiguousRunIsUsageError(t *testing.T) {
+	dir := setupRunWorkspace(t)
+	if _, err := runCLI(t, dir, "init", "other"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "projects", "other", "runs", "r_0001"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, err := runCLI(t, dir, "verdict", "--run", "r_0001", "--keep", "c_01_0")
+	var u usageErr
+	if !errors.As(err, &u) || !strings.Contains(err.Error(), "gradient-descent") ||
+		!strings.Contains(err.Error(), "other") {
+		t.Fatalf("ambiguous run: want usageErr naming both projects, got %v", err)
+	}
+}

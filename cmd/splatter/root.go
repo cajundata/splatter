@@ -35,6 +35,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newStatusCmd())
 	root.AddCommand(newGenCmd())
 	root.AddCommand(newFanCmd())
+	root.AddCommand(newVerdictCmd())
 	return root
 }
 
