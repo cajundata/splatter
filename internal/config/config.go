@@ -21,6 +21,7 @@ type Providers struct {
 	Version     int                 `yaml:"version"`
 	Profiles    map[string]Profile  `yaml:"profiles"`
 	ProfileSets map[string][]string `yaml:"profile_sets"`
+	path        string              // providers.yaml location, carried into resolution errors
 }
 
 type ModelPrice struct {
@@ -46,6 +47,7 @@ func LoadProviders(path string) (*Providers, error) {
 	if p.Version != 1 {
 		return nil, fmt.Errorf("%s: version: want 1, got %d", path, p.Version)
 	}
+	p.path = path
 	for id, prof := range p.Profiles {
 		if !knownProviders[prof.Provider] {
 			return nil, fmt.Errorf("%s: profile %s: unknown provider %q", path, id, prof.Provider)
@@ -79,6 +81,15 @@ func LoadPricing(path string) (*Pricing, error) {
 	return &p, nil
 }
 
+// source names the file resolution errors point at; struct literals
+// (tests) fall back to the conventional filename.
+func (p *Providers) source() string {
+	if p.path == "" {
+		return "providers.yaml"
+	}
+	return p.path
+}
+
 func (p *Providers) Resolve(profileID string) (Profile, error) {
 	prof, ok := p.Profiles[profileID]
 	if !ok {
@@ -87,7 +98,7 @@ func (p *Providers) Resolve(profileID string) (Profile, error) {
 			ids = append(ids, id)
 		}
 		sort.Strings(ids)
-		return Profile{}, fmt.Errorf("unknown profile %q (available: %s)", profileID, strings.Join(ids, ", "))
+		return Profile{}, fmt.Errorf("%s: unknown profile %q (available: %s)", p.source(), profileID, strings.Join(ids, ", "))
 	}
 	return prof, nil
 }

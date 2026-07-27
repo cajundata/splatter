@@ -74,6 +74,18 @@ func TestResolveUnknownProfileListsAvailable(t *testing.T) {
 	}
 }
 
+func TestResolveErrorCarriesProvidersPath(t *testing.T) {
+	path := writeFile(t, "providers.yaml", goodProviders)
+	p, err := LoadProviders(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.Resolve("nope")
+	if err == nil || !strings.Contains(err.Error(), path) {
+		t.Fatalf("Resolve error must carry the providers.yaml path %q, got %v", path, err)
+	}
+}
+
 func TestLoadPricing(t *testing.T) {
 	good := "version: \"2026-07-25.0\"\nmodels:\n  gpt-image-1:\n    usd_per_image: 0.04\n"
 	pr, err := LoadPricing(writeFile(t, "pricing.yaml", good))
