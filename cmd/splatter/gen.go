@@ -80,6 +80,9 @@ func newGenCmd() *cobra.Command {
 				N: n, Harness: "splatter " + version, Pricing: pricing, Provider: prov,
 			})
 			if err != nil {
+				if os.IsNotExist(err) {
+					return usageErr{err}
+				}
 				return err
 			}
 			var b strings.Builder

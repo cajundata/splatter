@@ -318,3 +318,14 @@ func TestGenUsageErrors(t *testing.T) {
 		t.Fatal("missing --brief must error")
 	}
 }
+
+func TestGenMissingBriefFileIsUsageError(t *testing.T) {
+	withFakeProvider(t, &cliFakeProvider{})
+	dir := setupGenWorkspace(t)
+	_, err := runCLI(t, dir, "gen", "--brief", "projects/gradient-descent/briefs/nope.md",
+		"--profile", "gemini-baseline")
+	var u usageErr
+	if !errors.As(err, &u) {
+		t.Fatalf("nonexistent brief: want usageErr (exit 2), got %T: %v", err, err)
+	}
+}
