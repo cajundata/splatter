@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,6 +19,8 @@ import (
 )
 
 type GenParams struct {
+	// Root is the workspace root and is expected to be an absolute path
+	// (as returned by workspace.FindRoot). BriefPath may be cwd-relative.
 	Root      string
 	BriefPath string
 	ProfileID string
@@ -99,7 +102,8 @@ func Gen(ctx context.Context, p GenParams) (*GenResult, error) {
 		Native: p.Profile.Native,
 	}
 	res, genErr := p.Provider.Generate(ctx, req)
-	if pe, ok := genErr.(*provider.Error); ok && pe.Stage == "config" {
+	var pe *provider.Error
+	if errors.As(genErr, &pe) && pe.Stage == "config" {
 		return nil, genErr
 	}
 
@@ -222,7 +226,8 @@ func writeNew(path string, data []byte) error {
 }
 
 func callErrorFrom(err error) *schema.CallError {
-	if pe, ok := err.(*provider.Error); ok {
+	var pe *provider.Error
+	if errors.As(err, &pe) {
 		return &schema.CallError{Stage: pe.Stage, HTTPStatus: pe.HTTPStatus, Message: pe.Message}
 	}
 	return &schema.CallError{Stage: "request", Message: err.Error()}

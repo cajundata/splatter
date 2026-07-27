@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/png"
 	"os"
@@ -291,5 +292,21 @@ func TestGenBriefOutsideProjectLeavesNoTrace(t *testing.T) {
 	entries, _ := os.ReadDir(filepath.Join(root, "projects", "gradient-descent", "runs"))
 	if len(entries) != 0 {
 		t.Fatalf("rejected brief must leave no run dirs: %v", entries)
+	}
+}
+
+func TestGenWrappedConfigErrorLeavesNoTrace(t *testing.T) {
+	root, briefPath := setupWorkspace(t)
+	fake := &fakeProvider{
+		caps: provider.Capabilities{MaxBatch: 4},
+		err:  fmt.Errorf("adapter: %w", &provider.Error{Stage: "config", Message: "missing FAKE_API_KEY"}),
+	}
+	_, err := Gen(context.Background(), genParams(root, briefPath, fake))
+	if err == nil || !strings.Contains(err.Error(), "missing FAKE_API_KEY") {
+		t.Fatalf("wrapped config-stage failure must be a Gen error, got %v", err)
+	}
+	entries, _ := os.ReadDir(filepath.Join(root, "projects", "gradient-descent", "runs"))
+	if len(entries) != 0 {
+		t.Fatalf("config-stage failure must leave no run dirs: %v", entries)
 	}
 }
