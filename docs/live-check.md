@@ -57,3 +57,49 @@ Confirm:
 - [x] rebuilding the sheet after the verdict shows keep status on the image
 
 Then unset the keys: `unset GEMINI_API_KEY OPENAI_API_KEY`
+
+# S4 Live Exit-Criterion Check (operator-run, both machines)
+
+The full M1 exit test: cross-machine handoff. No provider calls — uses an
+existing run from the S2/S3 checks (or fan a fresh one on Windows first).
+
+On **Windows** (PowerShell 7), in the workspace:
+
+```shell
+$env:SPLATTER_S3_ENDPOINT = "https://<region>.digitaloceanspaces.com"
+$env:SPLATTER_S3_BUCKET = "<bucket>"
+$env:SPLATTER_S3_ACCESS_KEY = "..."     # from your key store
+$env:SPLATTER_S3_SECRET_KEY = "..."
+
+splatter fan --brief projects/demo/briefs/b_001.md --set baseline
+splatter push
+splatter status                          # sync: configured, missing:0
+git add -A; git commit -m "demo run from windows"; git push
+```
+
+On **macOS**, in the workspace clone:
+
+```shell
+export SPLATTER_S3_ENDPOINT=https://<region>.digitaloceanspaces.com
+export SPLATTER_S3_BUCKET=<bucket>
+export SPLATTER_S3_ACCESS_KEY=...        # from your key store
+export SPLATTER_S3_SECRET_KEY=...
+
+git pull
+splatter status                          # missing:<n> before pull
+splatter pull
+splatter validate
+splatter sheet --run <run id> --open
+```
+
+Confirm:
+
+- [ ] push exits 0; re-running push reports 0 uploaded (idempotent)
+- [ ] bucket contains `blobs/<sha256>` keys, one per distinct image
+- [ ] after pull, `splatter status` shows missing:0 and validate exits 0
+- [ ] the rebuilt sheet opens with every image rendering from relative paths
+- [ ] the pulled manifest.jsonl is byte-identical to the Windows one
+      (`git diff` clean; hashes match)
+
+Then clear the env vars in both shells: PS7 `Remove-Item Env:SPLATTER_S3_*`,
+zsh `unset SPLATTER_S3_ENDPOINT SPLATTER_S3_BUCKET SPLATTER_S3_ACCESS_KEY SPLATTER_S3_SECRET_KEY`.

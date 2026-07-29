@@ -44,3 +44,14 @@ later runs rebuild the exe in place. Check with `splatter --version`.
 - [x] `splatter validate` — exit 0
 - [x] `git add -A; git commit -m s3; git ls-files --eol` — `verdicts.jsonl`
       and `manifest.jsonl` show `i/lf` (no CRLF drift from verdict appends)
+
+# S4 Windows Verification Checklist
+
+- [ ] `splatter push` with env vars set — uploads, exit 0, `$LASTEXITCODE` 0
+- [ ] `splatter push` again — `uploaded: 0`, all skipped, exit 0
+- [ ] `splatter push` with `$env:SPLATTER_S3_SECRET_KEY` removed — error names
+      the missing var, exit 1
+- [ ] `splatter status --json` — `"sync":"configured"` with vars set,
+      `"sync":"not configured"` without
+- [ ] `splatter pull` after deleting one local PNG — file restored,
+      `splatter validate` exit 0
