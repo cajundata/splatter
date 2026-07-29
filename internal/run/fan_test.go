@@ -8,7 +8,16 @@ import (
 	"testing"
 
 	"github.com/cajundata/splatter/internal/provider"
+	"github.com/cajundata/splatter/internal/provider/gemini"
+	"github.com/cajundata/splatter/internal/provider/openai"
 	"github.com/cajundata/splatter/internal/workspace"
+)
+
+// The pre-flight seam is discovered by type assertion at runtime; these
+// assertions fail the build if either real adapter drifts off it.
+var (
+	_ preflighter = (*gemini.Adapter)(nil)
+	_ preflighter = (*openai.Adapter)(nil)
 )
 
 // preflightFake is a fakeProvider with a controllable Preflight result.
