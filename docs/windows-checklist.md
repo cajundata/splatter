@@ -5,18 +5,18 @@ Run in PowerShell 7 on the Windows machine with
 `splatter.exe`. Report results back; S1's exit criterion is not fully met
 until every box is checked.
 
-- [ ] `mkdir ws; cd ws; splatter init` — scaffold listing, exit code 0
+- [x] `mkdir ws; cd ws; splatter init` — scaffold listing, exit code 0
       (`$LASTEXITCODE`)
-- [ ] `splatter validate` — prints `ok: <path>`, exit code 0
-- [ ] `splatter init` again — reports all files as existing, exit 0
-- [ ] `splatter init gradient-descent` — creates project, exit 0
-- [ ] `splatter status --json` — one JSON object, `"sync":"not configured"`
-- [ ] `splatter nonsense` — error to stderr, exit code 2
-- [ ] Open `.gitattributes` in an editor that shows line endings — file
+- [x] `splatter validate` — prints `ok: <path>`, exit code 0
+- [x] `splatter init` again — reports all files as existing, exit 0
+- [x] `splatter init gradient-descent` — creates project, exit 0
+- [x] `splatter status --json` — one JSON object, `"sync":"not configured"`
+- [x] `splatter nonsense` — error to stderr, exit code 2
+- [x] Open `.gitattributes` in an editor that shows line endings — file
       content contains `eol=lf`
-- [ ] `git init; git add -A; git commit -m x` inside ws, then
+- [x] `git init; git add -A; git commit -m x` inside ws, then
       `git ls-files --eol` — all text files show `i/lf`
-- [ ] On the M-series Mac: run `bin/darwin-arm64/splatter init && splatter validate`
+- [x] On the M-series Mac: run `bin/darwin-arm64/splatter init && splatter validate`
       in a fresh directory once — the arm64 artifact was format-verified but not
       executed during S1 (build host was x86_64)
 
@@ -31,16 +31,16 @@ To install or update `splatter.exe` (requires Go and this repo cloned):
 `%LOCALAPPDATA%\splatter\bin` on the user PATH (open a new shell after),
 later runs rebuild the exe in place. Check with `splatter --version`.
 
-- [ ] `splatter fan --brief projects/gradient-descent/briefs/b_001.md --set baseline`
+- [x] `splatter fan --brief projects/gradient-descent/briefs/b_001.md --set baseline`
       — per-call lines print; exit 0 with at least one success (`$LASTEXITCODE`)
-- [ ] `splatter fan --brief projects/gradient-descent/briefs/b_001.md` — usage
+- [x] `splatter fan --brief projects/gradient-descent/briefs/b_001.md` — usage
       error (neither --set nor --profiles), exit 2
-- [ ] `splatter sheet --run <run id>` — prints the sheet path, exit 0
-- [ ] Double-click `sheet.html` in Explorer — opens in the default browser
+- [x] `splatter sheet --run <run id>` — prints the sheet path, exit 0
+- [x] Double-click `sheet.html` in Explorer — opens in the default browser
       from the filesystem; thumbnails render and click through to full-res
-- [ ] `splatter sheet --run <run id> --open` — browser opens (`cmd /c start`)
-- [ ] `splatter verdict --run <run id> --keep <image id> --note "solid direction"`
+- [x] `splatter sheet --run <run id> --open` — browser opens (`cmd /c start`)
+- [x] `splatter verdict --run <run id> --keep <image id> --note "solid direction"`
       — exit 0; `splatter verdict --run <run id> --keep nope_id` — exit 2
-- [ ] `splatter validate` — exit 0
-- [ ] `git add -A; git commit -m s3; git ls-files --eol` — `verdicts.jsonl`
+- [x] `splatter validate` — exit 0
+- [x] `git add -A; git commit -m s3; git ls-files --eol` — `verdicts.jsonl`
       and `manifest.jsonl` show `i/lf` (no CRLF drift from verdict appends)
