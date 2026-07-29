@@ -236,3 +236,87 @@ func TestPushOutsideWorkspaceIsUsageError(t *testing.T) {
 		t.Fatalf("exit code: got %d want 2", code)
 	}
 }
+
+func TestPullMaterializesMissingImages(t *testing.T) {
+	srv := spacestest.New(t)
+	setSyncEnv(t, srv)
+	root, shas := buildSyncWorkspace(t, map[string][]byte{
+		"c_01_0": []byte("present"),
+		"c_01_1": nil, // referenced, absent locally
+	})
+	srv.Put("blobs/"+shas["c_01_1"], []byte("absent-c_01_1")) // bytes matching the manifest sha
+
+	out, err := runCLI(t, root, "pull", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := decodeSyncResult(t, out)
+	if res.Downloaded != 1 || res.Skipped != 1 || len(res.Failed) != 0 {
+		t.Fatalf("bad result: %+v", res)
+	}
+	img := filepath.Join(root, "projects", "demo", "runs", "r_0001", "images", "c_01_1.png")
+	data, err := os.ReadFile(img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "absent-c_01_1" {
+		t.Fatalf("downloaded bytes: %q", data)
+	}
+	// validate must pass afterward: the file matches its manifest sha
+	if _, err := runCLI(t, root, "validate"); err != nil {
+		t.Fatalf("validate after pull: %v", err)
+	}
+}
+
+func TestPullIdempotentRerun(t *testing.T) {
+	srv := spacestest.New(t)
+	setSyncEnv(t, srv)
+	root, shas := buildSyncWorkspace(t, map[string][]byte{"c_01_0": nil})
+	srv.Put("blobs/"+shas["c_01_0"], []byte("absent-c_01_0"))
+	if _, err := runCLI(t, root, "pull"); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runCLI(t, root, "pull", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := decodeSyncResult(t, out)
+	if res.Downloaded != 0 || res.Skipped != 1 {
+		t.Fatalf("re-pull must download nothing: %+v", res)
+	}
+}
+
+func TestPullRejectsCorruptRemoteBlob(t *testing.T) {
+	srv := spacestest.New(t)
+	setSyncEnv(t, srv)
+	root, shas := buildSyncWorkspace(t, map[string][]byte{"c_01_0": nil})
+	srv.Put("blobs/"+shas["c_01_0"], []byte("wrong bytes"))
+
+	out, err := runCLI(t, root, "pull", "--json")
+	if err == nil {
+		t.Fatal("pull must exit non-zero on hash mismatch")
+	}
+	res := decodeSyncResult(t, out)
+	if len(res.Failed) != 1 || res.Downloaded != 0 {
+		t.Fatalf("bad result: %+v", res)
+	}
+	img := filepath.Join(root, "projects", "demo", "runs", "r_0001", "images", "c_01_0.png")
+	if _, err := os.Stat(img); !os.IsNotExist(err) {
+		t.Fatal("corrupt bytes must never land at a manifest-referenced path")
+	}
+}
+
+func TestPullRemoteMissingBlobFails(t *testing.T) {
+	srv := spacestest.New(t)
+	setSyncEnv(t, srv)
+	root, _ := buildSyncWorkspace(t, map[string][]byte{"c_01_0": nil})
+	// nothing seeded remotely
+	out, err := runCLI(t, root, "pull", "--json")
+	if err == nil {
+		t.Fatal("want error when a referenced blob is nowhere")
+	}
+	res := decodeSyncResult(t, out)
+	if len(res.Failed) != 1 {
+		t.Fatalf("bad result: %+v", res)
+	}
+}
