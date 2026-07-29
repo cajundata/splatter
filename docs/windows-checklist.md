@@ -19,3 +19,23 @@ until every box is checked.
 - [ ] On the M-series Mac: run `bin/darwin-arm64/splatter init && splatter validate`
       in a fresh directory once — the arm64 artifact was format-verified but not
       executed during S1 (build host was x86_64)
+
+# S3 Windows Verification Checklist
+
+Same setup as S1 (PS7, `splatter.exe` on PATH, workspace `ws` with project
+`gradient-descent` and brief `b_001.md`). Set `GEMINI_API_KEY` and
+`OPENAI_API_KEY` in the session for the fan step.
+
+- [ ] `splatter fan --brief projects/gradient-descent/briefs/b_001.md --set baseline`
+      — per-call lines print; exit 0 with at least one success (`$LASTEXITCODE`)
+- [ ] `splatter fan --brief projects/gradient-descent/briefs/b_001.md` — usage
+      error (neither --set nor --profiles), exit 2
+- [ ] `splatter sheet --run <run id>` — prints the sheet path, exit 0
+- [ ] Double-click `sheet.html` in Explorer — opens in the default browser
+      from the filesystem; thumbnails render and click through to full-res
+- [ ] `splatter sheet --run <run id> --open` — browser opens (`cmd /c start`)
+- [ ] `splatter verdict --run <run id> --keep <image id> --note "solid direction"`
+      — exit 0; `splatter verdict --run <run id> --keep nope_id` — exit 2
+- [ ] `splatter validate` — exit 0
+- [ ] `git add -A; git commit -m s3; git ls-files --eol` — `verdicts.jsonl`
+      and `manifest.jsonl` show `i/lf` (no CRLF drift from verdict appends)

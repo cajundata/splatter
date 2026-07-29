@@ -27,10 +27,31 @@ splatter validate
 ```
 
 Confirm for EACH run directory under projects/demo/runs/:
-- [ ] images/ contains PNG(s) that open
-- [ ] manifest.jsonl call record has latency_ms > 0, http_status 200
-- [ ] cost.source is "table:<version>" (or "reported"), never untagged
-- [ ] raw/c_01.json exists and contains "$blob" instead of image base64
-- [ ] `splatter validate` exits 0
+- [x] images/ contains PNG(s) that open
+- [x] manifest.jsonl call record has latency_ms > 0, http_status 200
+- [x] cost.source is "table:<version>" (or "reported"), never untagged
+- [x] raw/c_01.json exists and contains "$blob" instead of image base64
+- [x] `splatter validate` exits 0
+
+Then unset the keys: `unset GEMINI_API_KEY OPENAI_API_KEY`
+
+# S3 Live Exit-Criterion Check (operator-run, macOS)
+
+Cost: one Gemini call + one OpenAI call (~$0.08). Same key setup and demo
+workspace as the S2 check above.
+
+```shell
+splatter fan --brief projects/demo/briefs/b_001.md --set baseline
+splatter sheet --run <run id> --open
+splatter verdict --run <run id> --keep <an image id> --note "<image id>: crisp" --note "good round"
+splatter validate
+```
+
+Confirm:
+- [ ] fan exits 0 with one call per profile recorded in one manifest
+- [ ] the sheet opens from the filesystem: provider groups, thumbnails
+      linking to full-res, cost with source tag, copyable verdict block
+- [ ] the verdict appends to projects/demo/verdicts.jsonl and validate exits 0
+- [ ] rebuilding the sheet after the verdict shows keep status on the image
 
 Then unset the keys: `unset GEMINI_API_KEY OPENAI_API_KEY`
