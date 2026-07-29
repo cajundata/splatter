@@ -28,10 +28,14 @@ func parseNote(raw string) schema.VerdictNote {
 	return schema.VerdictNote{Image: &id, Text: strings.TrimSpace(raw[len(m[0]):])}
 }
 
+// splitIDs parses a comma-separated id list, dropping empties and
+// duplicates (an evidence record must not double-count an image).
 func splitIDs(csv string) []string {
 	var ids []string
+	seen := map[string]bool{}
 	for _, s := range strings.Split(csv, ",") {
-		if s = strings.TrimSpace(s); s != "" {
+		if s = strings.TrimSpace(s); s != "" && !seen[s] {
+			seen[s] = true
 			ids = append(ids, s)
 		}
 	}

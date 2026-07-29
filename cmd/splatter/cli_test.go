@@ -638,6 +638,23 @@ func TestVerdictRejectionsAppendNothing(t *testing.T) {
 	}
 }
 
+func TestVerdictDeduplicatesKeepIDs(t *testing.T) {
+	dir := setupRunWorkspace(t)
+	out, err := runCLI(t, dir, "verdict", "--run", "r_0001", "--keep", "c_01_0,c_01_0", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec struct {
+		Keep []string `json:"keep"`
+	}
+	if err := json.Unmarshal([]byte(out), &rec); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.Keep) != 1 || rec.Keep[0] != "c_01_0" {
+		t.Fatalf("duplicate ids must collapse to one entry: %+v", rec.Keep)
+	}
+}
+
 func TestVerdictAmbiguousRunIsUsageError(t *testing.T) {
 	dir := setupRunWorkspace(t)
 	if _, err := runCLI(t, dir, "init", "other"); err != nil {
