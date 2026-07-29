@@ -48,10 +48,10 @@ splatter validate
 ```
 
 Confirm:
-- [ ] fan exits 0 with one call per profile recorded in one manifest
-- [ ] the sheet opens from the filesystem: provider groups, thumbnails
+- [x] fan exits 0 with one call per profile recorded in one manifest
+- [x] the sheet opens from the filesystem: provider groups, thumbnails
       linking to full-res, cost with source tag, copyable verdict block
-- [ ] the verdict appends to projects/demo/verdicts.jsonl and validate exits 0
-- [ ] rebuilding the sheet after the verdict shows keep status on the image
+- [x] the verdict appends to projects/demo/verdicts.jsonl and validate exits 0
+- [x] rebuilding the sheet after the verdict shows keep status on the image
 
 Then unset the keys: `unset GEMINI_API_KEY OPENAI_API_KEY`
