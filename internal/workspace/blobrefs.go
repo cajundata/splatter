@@ -48,6 +48,9 @@ func projectBlobRefs(root, name string) ([]BlobRef, error) {
 func collectProjectBlobs(root, name string, bySHA map[string]map[string]bool) error {
 	runDirs, _ := filepath.Glob(filepath.Join(root, "projects", name, "runs", "r_*"))
 	for _, rd := range runDirs {
+		if fi, err := os.Stat(rd); err != nil || !fi.IsDir() {
+			continue // a stray file matching r_* is not a run; validate flags this
+		}
 		mp := filepath.Join(rd, "manifest.jsonl")
 		f, err := os.Open(mp)
 		if os.IsNotExist(err) {

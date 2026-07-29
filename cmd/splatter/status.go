@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cajundata/splatter/internal/spaces"
 	"github.com/cajundata/splatter/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -40,13 +41,16 @@ func newStatusCmd() *cobra.Command {
 			if projects == nil {
 				projects = []workspace.ProjectStatus{}
 			}
-			// Spaces sync arrives in S4; report honestly until then.
-			res := statusResult{Root: root, Sync: "not configured", Projects: projects}
+			sync := "configured"
+			if _, err := spaces.FromEnv(); err != nil {
+				sync = "not configured"
+			}
+			res := statusResult{Root: root, Sync: sync, Projects: projects}
 			var b strings.Builder
 			fmt.Fprintf(&b, "workspace: %s\nsync: %s\n", res.Root, res.Sync)
 			for _, p := range res.Projects {
-				fmt.Fprintf(&b, "  %-24s briefs:%d runs:%d verdicts:%d critiques:%d\n",
-					p.Name, p.Briefs, p.Runs, p.Verdicts, p.Critiques)
+				fmt.Fprintf(&b, "  %-24s briefs:%d runs:%d verdicts:%d critiques:%d missing:%d\n",
+					p.Name, p.Briefs, p.Runs, p.Verdicts, p.Critiques, p.MissingImages)
 			}
 			if len(res.Projects) == 0 {
 				b.WriteString("  no projects\n")

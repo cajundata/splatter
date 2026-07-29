@@ -320,3 +320,47 @@ func TestPullRemoteMissingBlobFails(t *testing.T) {
 		t.Fatalf("bad result: %+v", res)
 	}
 }
+
+func TestStatusReportsSyncConfiguration(t *testing.T) {
+	srv := spacestest.New(t)
+	root, _ := buildSyncWorkspace(t, map[string][]byte{"c_01_0": nil})
+
+	// Unconfigured: all vars empty.
+	for _, v := range []string{"SPLATTER_S3_ENDPOINT", "SPLATTER_S3_BUCKET",
+		"SPLATTER_S3_ACCESS_KEY", "SPLATTER_S3_SECRET_KEY"} {
+		t.Setenv(v, "")
+	}
+	out, err := runCLI(t, root, "status", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res struct {
+		Sync     string `json:"sync"`
+		Projects []struct {
+			Name          string `json:"name"`
+			MissingImages int    `json:"missing_images"`
+		} `json:"projects"`
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.Sync != "not configured" {
+		t.Fatalf("sync: %q", res.Sync)
+	}
+	if len(res.Projects) != 1 || res.Projects[0].MissingImages != 1 {
+		t.Fatalf("projects: %+v", res.Projects)
+	}
+
+	// Configured: vars set.
+	setSyncEnv(t, srv)
+	out, err = runCLI(t, root, "status", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.Sync != "configured" {
+		t.Fatalf("sync: %q", res.Sync)
+	}
+}

@@ -119,6 +119,29 @@ func TestBlobRefsMalformedManifestIsError(t *testing.T) {
 	}
 }
 
+func TestBlobRefsIgnoresNonDirRunEntries(t *testing.T) {
+	root := t.TempDir()
+	if _, err := ScaffoldWorkspace(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ScaffoldProject(root, "alpha"); err != nil {
+		t.Fatal(err)
+	}
+	writeRunFixture(t, root, "alpha", "r_0001", "c_01_0", shaOf("x"))
+	// a stray file matching r_* must not be treated as a run dir
+	stray := filepath.Join(root, "projects", "alpha", "runs", "r_stray.txt")
+	if err := os.WriteFile(stray, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	refs, err := BlobRefs(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(refs) != 1 {
+		t.Fatalf("want 1 ref, got %+v", refs)
+	}
+}
+
 func TestBlobRefsEmptyWorkspace(t *testing.T) {
 	root := t.TempDir()
 	if _, err := ScaffoldWorkspace(root); err != nil {

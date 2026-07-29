@@ -182,6 +182,12 @@ func TestValidateFindingsAreValidationError(t *testing.T) {
 
 func TestStatusJSON(t *testing.T) {
 	dir := t.TempDir()
+	// Sync must report honestly based on env, not whatever the test
+	// process happened to inherit.
+	for _, v := range []string{"SPLATTER_S3_ENDPOINT", "SPLATTER_S3_BUCKET",
+		"SPLATTER_S3_ACCESS_KEY", "SPLATTER_S3_SECRET_KEY"} {
+		t.Setenv(v, "")
+	}
 	if _, err := runCLI(t, dir, "init"); err != nil {
 		t.Fatal(err)
 	}
