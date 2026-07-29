@@ -477,6 +477,78 @@ func setupRunWorkspace(t *testing.T) string {
 	return dir
 }
 
+func TestSheetWritesHTMLIntoRunDir(t *testing.T) {
+	dir := setupRunWorkspace(t)
+	out, err := runCLI(t, dir, "sheet", "--run", "r_0001", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res struct {
+		Run  string `json:"run"`
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal([]byte(out), &res); err != nil {
+		t.Fatalf("stdout not JSON: %v\n%q", err, out)
+	}
+	want := filepath.Join(dir, "projects", "gradient-descent", "runs", "r_0001", "sheet.html")
+	if res.Run != "r_0001" || res.Path != want {
+		t.Fatalf("result: %+v (want path %s)", res, want)
+	}
+	html, err := os.ReadFile(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(html), `href="images/c_01_0.png"`) {
+		t.Fatalf("sheet must reference images relatively:\n%s", html)
+	}
+	// sheet is a derived file: regeneration is idempotent
+	if _, err := runCLI(t, dir, "sheet", "--run", "r_0001"); err != nil {
+		t.Fatal(err)
+	}
+	again, err := os.ReadFile(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(html, again) {
+		t.Fatal("regenerating an unchanged run must reproduce identical bytes")
+	}
+	// a written sheet never breaks validate
+	if _, err := runCLI(t, dir, "validate"); err != nil {
+		t.Fatalf("validate must pass with sheet.html present: %v", err)
+	}
+}
+
+func TestSheetReflectsVerdicts(t *testing.T) {
+	dir := setupRunWorkspace(t)
+	if _, err := runCLI(t, dir, "verdict", "--run", "r_0001", "--keep", "c_01_0"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runCLI(t, dir, "sheet", "--run", "r_0001"); err != nil {
+		t.Fatal(err)
+	}
+	html, err := os.ReadFile(filepath.Join(dir, "projects", "gradient-descent", "runs", "r_0001", "sheet.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(html), `<span class="status-keep">keep</span>`) {
+		t.Fatal("sheet must show per-image keep status after a verdict")
+	}
+}
+
+func TestSheetUsageErrors(t *testing.T) {
+	dir := setupRunWorkspace(t)
+	for _, args := range [][]string{
+		{"sheet"},                    // missing --run
+		{"sheet", "--run", "r_0099"}, // unknown run
+	} {
+		_, err := runCLI(t, dir, args...)
+		var u usageErr
+		if !errors.As(err, &u) {
+			t.Fatalf("%v: want usageErr, got %T: %v", args, err, err)
+		}
+	}
+}
+
 func TestVerdictAppendsAndValidates(t *testing.T) {
 	dir := setupRunWorkspace(t)
 	out, err := runCLI(t, dir, "verdict", "--run", "r_0001",
