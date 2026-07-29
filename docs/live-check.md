@@ -27,6 +27,7 @@ splatter validate
 ```
 
 Confirm for EACH run directory under projects/demo/runs/:
+
 - [x] images/ contains PNG(s) that open
 - [x] manifest.jsonl call record has latency_ms > 0, http_status 200
 - [x] cost.source is "table:<version>" (or "reported"), never untagged
@@ -43,11 +44,12 @@ workspace as the S2 check above.
 ```shell
 splatter fan --brief projects/demo/briefs/b_001.md --set baseline
 splatter sheet --run <run id> --open
-splatter verdict --run <run id> --keep <an image id> --note "<image id>: crisp" --note "good round"
+splatter verdict --run <run id> --keep <an image id> --note "<image id>: crisp test" --note "good test"
 splatter validate
 ```
 
 Confirm:
+
 - [x] fan exits 0 with one call per profile recorded in one manifest
 - [x] the sheet opens from the filesystem: provider groups, thumbnails
       linking to full-res, cost with source tag, copyable verdict block
