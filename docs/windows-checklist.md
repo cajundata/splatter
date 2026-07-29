@@ -26,6 +26,11 @@ Same setup as S1 (PS7, `splatter.exe` on PATH, workspace `ws` with project
 `gradient-descent` and brief `b_001.md`). Set `GEMINI_API_KEY` and
 `OPENAI_API_KEY` in the session for the fan step.
 
+To install or update `splatter.exe` (requires Go and this repo cloned):
+`git pull; .\scripts\install.ps1` from the repo root — first run registers
+`%LOCALAPPDATA%\splatter\bin` on the user PATH (open a new shell after),
+later runs rebuild the exe in place. Check with `splatter --version`.
+
 - [ ] `splatter fan --brief projects/gradient-descent/briefs/b_001.md --set baseline`
       — per-call lines print; exit 0 with at least one success (`$LASTEXITCODE`)
 - [ ] `splatter fan --brief projects/gradient-descent/briefs/b_001.md` — usage
