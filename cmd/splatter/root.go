@@ -37,6 +37,7 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newFanCmd())
 	root.AddCommand(newVerdictCmd())
 	root.AddCommand(newSheetCmd())
+	root.AddCommand(newPushCmd())
 	return root
 }
 
