@@ -32,6 +32,32 @@ func TestSignMatchesAWSGetObjectExample(t *testing.T) {
 	}
 }
 
+// AWS's published S3 SigV4 PUT-object example (same worked-example set as
+// the GET vector above): known inputs, known Authorization header. The
+// request is built from a pre-encoded URL string so EscapedPath returns
+// "/test%24file.text", matching AWS's canonical encoding of "$" as "%24"
+// (net/url would not otherwise escape "$" on its own). Verified against
+// the AWS S3 API Reference, "Using an Authorization Header" > "Example:
+// PUT Object" (https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html).
+func TestSignMatchesAWSPutObjectExample(t *testing.T) {
+	req, err := http.NewRequest("PUT", "https://examplebucket.s3.amazonaws.com/test%24file.text", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Date", "Fri, 24 May 2013 00:00:00 GMT")
+	req.Header.Set("x-amz-storage-class", "REDUCED_REDUNDANCY")
+	now := time.Date(2013, 5, 24, 0, 0, 0, 0, time.UTC)
+	Sign(req, "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+		"us-east-1", "44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072", now)
+
+	want := "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request, " +
+		"SignedHeaders=date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class, " +
+		"Signature=98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd"
+	if got := req.Header.Get("Authorization"); got != want {
+		t.Fatalf("authorization mismatch:\n got: %s\nwant: %s", got, want)
+	}
+}
+
 // Signing must be deterministic: same inputs, same signature.
 func TestSignDeterministic(t *testing.T) {
 	now := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)

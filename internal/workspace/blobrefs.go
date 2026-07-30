@@ -6,10 +6,16 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 
 	"github.com/cajundata/splatter/internal/schema"
 )
+
+// shaHexRe matches a lowercase-hex sha256 digest: the only shape a
+// manifest-supplied sha256 may take before it is spliced into blob
+// storage keys and request URLs.
+var shaHexRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // BlobRef is one content-addressed image blob and every workspace-
 // relative, slash-normalized path that references it. Multiple paths
@@ -80,7 +86,19 @@ func collectProjectBlobs(root, name string, bySHA map[string]map[string]bool) er
 				continue
 			}
 			for _, img := range rec.Images {
+				if !shaHexRe.MatchString(img.SHA256) {
+					f.Close()
+					return fmt.Errorf("%s line %d: invalid sha256 %q: want 64 lowercase hex characters", mp, lineNo, img.SHA256)
+				}
+				if !filepath.IsLocal(filepath.FromSlash(img.File)) {
+					f.Close()
+					return fmt.Errorf("%s line %d: invalid file %q: escapes run directory", mp, lineNo, img.File)
+				}
 				p := path.Join(runPrefix, img.File)
+				if !filepath.IsLocal(filepath.FromSlash(p)) {
+					f.Close()
+					return fmt.Errorf("%s line %d: invalid file %q: escapes workspace", mp, lineNo, img.File)
+				}
 				if bySHA[img.SHA256] == nil {
 					bySHA[img.SHA256] = map[string]bool{}
 				}

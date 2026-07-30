@@ -119,6 +119,73 @@ func TestBlobRefsMalformedManifestIsError(t *testing.T) {
 	}
 }
 
+// appendMaliciousRecord appends a schema.CallRecord to an existing,
+// otherwise-valid manifest with a single image carrying an
+// attacker-controlled file path and/or sha256 (manifests arrive via git
+// from other machines; these fields must be validated at the single
+// choke point that later feeds workspace-relative writes and blob
+// storage keys).
+func appendMaliciousRecord(t *testing.T, mp, run, file, sha string) {
+	t.Helper()
+	usd := 0.1
+	rec := schema.CallRecord{
+		V: 1, Type: "call", Run: run, Call: "c_02", TS: time.Now().UTC(),
+		Provider: "gemini", ModelRequested: "m", ModelReturned: "m",
+		Profile: "p", Operation: "generate",
+		Request:  schema.CallRequest{Prompt: "p", N: 1, Aspect: "square"},
+		Response: schema.CallResponse{LatencyMS: 1, HTTPStatus: 200},
+		Cost:     schema.Cost{USD: &usd, Source: "reported"},
+		Images: []schema.ImageRef{{ID: "c_02_0", File: file,
+			SHA256: sha, W: 8, H: 8, AspectActual: "square"}},
+		Raw: "raw/c_02.json",
+	}
+	if err := fsio.AppendRecord(mp, rec); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBlobRefsRejectsPathTraversal(t *testing.T) {
+	root := t.TempDir()
+	if _, err := ScaffoldWorkspace(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ScaffoldProject(root, "alpha"); err != nil {
+		t.Fatal(err)
+	}
+	writeRunFixture(t, root, "alpha", "r_0001", "c_01_0", shaOf("x"))
+	mp := filepath.Join(root, "projects", "alpha", "runs", "r_0001", "manifest.jsonl")
+	appendMaliciousRecord(t, mp, "r_0001", "../../../evil.png", shaOf("x"))
+
+	_, err := BlobRefs(root)
+	if err == nil {
+		t.Fatal("want error for path traversal")
+	}
+	if !strings.Contains(err.Error(), mp) {
+		t.Fatalf("error should name the manifest path: %v", err)
+	}
+}
+
+func TestBlobRefsRejectsBadSHA256(t *testing.T) {
+	root := t.TempDir()
+	if _, err := ScaffoldWorkspace(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ScaffoldProject(root, "alpha"); err != nil {
+		t.Fatal(err)
+	}
+	writeRunFixture(t, root, "alpha", "r_0001", "c_01_0", shaOf("x"))
+	mp := filepath.Join(root, "projects", "alpha", "runs", "r_0001", "manifest.jsonl")
+	appendMaliciousRecord(t, mp, "r_0001", "images/c_02_0.png", "abc")
+
+	_, err := BlobRefs(root)
+	if err == nil {
+		t.Fatal("want error for non-hex sha256")
+	}
+	if !strings.Contains(err.Error(), mp) {
+		t.Fatalf("error should name the manifest path: %v", err)
+	}
+}
+
 func TestBlobRefsIgnoresNonDirRunEntries(t *testing.T) {
 	root := t.TempDir()
 	if _, err := ScaffoldWorkspace(root); err != nil {
