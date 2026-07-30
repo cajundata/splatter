@@ -24,9 +24,9 @@ Splatter is one half of a two-repo pair:
   source, just data that gets synced between machines.
 
 The split is deliberate: splatter is the tool, splats is the material the
-tool operates on. A design session runs an agent (Claude Code) inside a
-splats workspace with `splatter` on PATH — the agent writes briefs and
-critiques, and calls `splatter` for everything else. It never touches
+tool operates on. A design session runs an agent ( Claude Code or Codex)
+inside a splats workspace with `splatter` on PATH — the agent writes briefs
+and critiques, and calls `splatter` for everything else. It never touches
 `runs/` or `packages/` directly, and every cost or latency claim it makes
 has to trace back to a manifest record from that session.
 
@@ -35,19 +35,19 @@ has to trace back to a manifest record from that session.
 M1 ("end-to-end evidence loop") is functionally complete except for
 cross-machine sync:
 
-| Command | Status |
-| --- | --- |
-| `splatter init` | done — scaffolds a workspace or project |
-| `splatter status` | done |
-| `splatter validate` | done — schemas, hashes, critique files |
-| `splatter gen` | done — single-profile generation |
-| `splatter fan` | done — one brief across a provider set |
-| `splatter sheet` | done — self-contained HTML review sheet |
-| `splatter verdict` | done — keep/cull/notes, append-only |
-| `splatter push` / `pull` | not yet built |
-| `splatter export` | not yet built (M3) |
-| `splatter report` | not yet built (M4) |
-| `splatter providers` | not yet built |
+| Command                  | Status                                  |
+| ------------------------ | --------------------------------------- |
+| `splatter init`          | done — scaffolds a workspace or project |
+| `splatter status`        | done                                    |
+| `splatter validate`      | done — schemas, hashes, critique files  |
+| `splatter gen`           | done — single-profile generation        |
+| `splatter fan`           | done — one brief across a provider set  |
+| `splatter sheet`         | done — self-contained HTML review sheet |
+| `splatter verdict`       | done — keep/cull/notes, append-only     |
+| `splatter push` / `pull` | not yet built                           |
+| `splatter export`        | not yet built (M3)                      |
+| `splatter report`        | not yet built (M4)                      |
+| `splatter providers`     | not yet built                           |
 
 Two provider adapters exist today: Gemini and OpenAI image generation, both
 behind an instrumented `http.RoundTripper` that measures real wall-clock
