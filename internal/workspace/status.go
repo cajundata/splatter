@@ -8,11 +8,12 @@ import (
 )
 
 type ProjectStatus struct {
-	Name      string `json:"name"`
-	Briefs    int    `json:"briefs"`
-	Runs      int    `json:"runs"`
-	Verdicts  int    `json:"verdicts"`
-	Critiques int    `json:"critiques"`
+	Name          string `json:"name"`
+	Briefs        int    `json:"briefs"`
+	Runs          int    `json:"runs"`
+	Verdicts      int    `json:"verdicts"`
+	Critiques     int    `json:"critiques"`
+	MissingImages int    `json:"missing_images"`
 }
 
 // Status reports per-project evidence counts, sorted by project name.
@@ -35,6 +36,17 @@ func Status(root string) ([]ProjectStatus, error) {
 		}
 		crits, _ := filepath.Glob(filepath.Join(proj, "critiques", "*.json"))
 		s.Critiques = len(crits)
+		refs, err := projectBlobRefs(root, name)
+		if err != nil {
+			return nil, fmt.Errorf("manifests for %s: %w", name, err)
+		}
+		for _, ref := range refs {
+			for _, p := range ref.Paths {
+				if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(p))); err != nil {
+					s.MissingImages++
+				}
+			}
+		}
 		if f, err := os.Open(filepath.Join(proj, "verdicts.jsonl")); err == nil {
 			sc := bufio.NewScanner(f)
 			sc.Buffer(make([]byte, 0, maxLineBytes), maxLineBytes)

@@ -50,3 +50,22 @@ func TestStatusIgnoresNonDirRunEntries(t *testing.T) {
 		t.Fatalf("want 1 run, got %d", statuses[0].Runs)
 	}
 }
+
+func TestStatusCountsMissingImages(t *testing.T) {
+	root := t.TempDir()
+	if _, err := ScaffoldWorkspace(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ScaffoldProject(root, "alpha"); err != nil {
+		t.Fatal(err)
+	}
+	// one referenced image, not written to disk
+	writeRunFixture(t, root, "alpha", "r_0001", "c_01_0", shaOf("gone"))
+	statuses, err := Status(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(statuses) != 1 || statuses[0].MissingImages != 1 {
+		t.Fatalf("bad statuses: %+v", statuses)
+	}
+}
